@@ -348,10 +348,19 @@ jobs:
 
           if [[ -n "${release_id}" ]]; then
             jq -n \
+              --arg tag "${TAG_NAME}" \
+              --arg target "${GITHUB_SHA}" \
               --arg name "${RELEASE_NAME}" \
               --rawfile body release-notes.md \
               --argjson prerelease "${prerelease}" \
-              '{ name: $name, body: $body, draft: true, prerelease: $prerelease }' \
+              '{
+                tag_name: $tag,
+                target_commitish: $target,
+                name: $name,
+                body: $body,
+                draft: true,
+                prerelease: $prerelease
+              }' \
               > release-state.json
             gh api \
               --method PATCH \
@@ -392,6 +401,12 @@ jobs:
       - name: Upload GitHub Release assets
         run: |
           set -euo pipefail
+          release_id="${RELEASE_ID:-}"
+          if [[ -z "${release_id}" ]]; then
+            echo "::error::Missing RELEASE_ID for ${TAG_NAME}"
+            exit 1
+          fi
+
           mapfile -d '' assets < <(
             find release-artifacts -type f \
               \( -name 'Sino-Code-*' -o -name 'latest*.yml' \) \
@@ -403,7 +418,31 @@ jobs:
             exit 1
           fi
 
-          gh release upload "${TAG_NAME}" "${assets[@]}" --clobber
+          for asset in "${assets[@]}"; do
+            asset_name="$(basename "${asset}")"
+            existing_asset_ids="$(
+              gh api "repos/${GITHUB_REPOSITORY}/releases/${release_id}/assets?per_page=100" \
+                | jq -r --arg name "${asset_name}" '.[] | select(.name == $name) | .id'
+            )"
+
+            for existing_asset_id in ${existing_asset_ids}; do
+              gh api \
+                --method DELETE \
+                "repos/${GITHUB_REPOSITORY}/releases/assets/${existing_asset_id}" \
+                > /dev/null
+            done
+
+            encoded_name="$(node -e 'process.stdout.write(encodeURIComponent(process.argv[1]))' "${asset_name}")"
+            echo "Uploading ${asset_name}"
+            curl --fail-with-body --silent --show-error \
+              --request POST \
+              --header "Authorization: Bearer ${GH_TOKEN}" \
+              --header "Accept: application/vnd.github+json" \
+              --header "Content-Type: application/octet-stream" \
+              --data-binary @"${asset}" \
+              "https://uploads.github.com/repos/${GITHUB_REPOSITORY}/releases/${release_id}/assets?name=${encoded_name}" \
+              > /dev/null
+          done
 
       - name: Publish GitHub Release
         run: |
