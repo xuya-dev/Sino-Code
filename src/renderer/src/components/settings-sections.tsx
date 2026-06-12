@@ -1,0 +1,6 @@
+export { GeneralSettingsSection } from './settings-section-general'
+export { ProvidersSettingsSection } from './settings-section-providers'
+export { WriteSettingsSection } from './settings-section-write'
+export { AgentsSettingsSection } from './settings-section-agents'
+export { ClawSettingsSection } from './settings-section-claw'
+export { KeyboardShortcutsSettingsSection } from './settings-section-shortcuts'
