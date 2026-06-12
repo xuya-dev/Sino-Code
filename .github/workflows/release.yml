@@ -334,23 +334,60 @@ jobs:
       - name: Create or update draft GitHub Release
         run: |
           set -euo pipefail
-          release_flags=(--draft)
+
+          prerelease=false
           if [[ "${RELEASE_CHANNEL}" == "frontier" ]]; then
-            release_flags+=(--prerelease)
+            prerelease=true
           fi
 
-          if gh release view "${TAG_NAME}" > /dev/null 2>&1; then
-            gh release edit "${TAG_NAME}" \
-              --title "${RELEASE_NAME}" \
-              --notes-file release-notes.md \
-              "${release_flags[@]}"
+          release_id="$(
+            gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
+              --jq ".[] | select(.tag_name == \"${TAG_NAME}\") | .id" \
+              | head -n 1
+          )"
+
+          if [[ -n "${release_id}" ]]; then
+            jq -n \
+              --arg name "${RELEASE_NAME}" \
+              --rawfile body release-notes.md \
+              --argjson prerelease "${prerelease}" \
+              '{ name: $name, body: $body, draft: true, prerelease: $prerelease }' \
+              > release-state.json
+            gh api \
+              --method PATCH \
+              "repos/${GITHUB_REPOSITORY}/releases/${release_id}" \
+              --input release-state.json \
+              > release-response.json
           else
-            gh release create "${TAG_NAME}" \
-              --title "${RELEASE_NAME}" \
-              --notes-file release-notes.md \
-              --verify-tag \
-              "${release_flags[@]}"
+            jq -n \
+              --arg tag "${TAG_NAME}" \
+              --arg target "${GITHUB_SHA}" \
+              --arg name "${RELEASE_NAME}" \
+              --rawfile body release-notes.md \
+              --argjson prerelease "${prerelease}" \
+              '{
+                tag_name: $tag,
+                target_commitish: $target,
+                name: $name,
+                body: $body,
+                draft: true,
+                prerelease: $prerelease
+              }' \
+              > release-state.json
+            gh api \
+              --method POST \
+              "repos/${GITHUB_REPOSITORY}/releases" \
+              --input release-state.json \
+              > release-response.json
           fi
+
+          release_id="$(jq -r '.id // empty' release-response.json)"
+          if [[ -z "${release_id}" ]]; then
+            echo "::error::Could not resolve GitHub release id for ${TAG_NAME}"
+            cat release-response.json
+            exit 1
+          fi
+          echo "RELEASE_ID=${release_id}" >> "${GITHUB_ENV}"
 
       - name: Upload GitHub Release assets
         run: |
@@ -372,7 +409,19 @@ jobs:
         run: |
           set -euo pipefail
 
-          release_id="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG_NAME}" --jq .id)"
+          release_id="${RELEASE_ID:-}"
+          if [[ -z "${release_id}" ]]; then
+            release_id="$(
+              gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
+                --jq ".[] | select(.tag_name == \"${TAG_NAME}\") | .id" \
+                | head -n 1
+            )"
+          fi
+          if [[ -z "${release_id}" ]]; then
+            echo "::error::Could not resolve GitHub release id for ${TAG_NAME}"
+            exit 1
+          fi
+
           if [[ "${RELEASE_CHANNEL}" == "frontier" ]]; then
             jq -n '{ draft: false, prerelease: true }' > release-state.json
           else
