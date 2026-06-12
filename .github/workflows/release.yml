@@ -1,32 +1,35 @@
 name: Release
 
 on:
-  pull_request:
-    types:
-      - closed
-    branches:
-      - master
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: Release channel
+        required: true
+        default: stable
+        type: choice
+        options:
+          - stable
+          - frontier
+  push:
+    tags:
+      - 'v*'
 
 permissions:
   contents: write
 
 concurrency:
-  group: release-master
+  group: release-${{ github.ref }}
   cancel-in-progress: false
 
 env:
   NODE_VERSION: '22'
-  RELEASE_CHANNEL: stable
+  RELEASE_CHANNEL: ${{ github.event.inputs.channel || 'stable' }}
 
 jobs:
   prepare:
     name: Prepare release version
     runs-on: ubuntu-latest
-    if: >-
-      github.event.pull_request.merged == true &&
-      github.event.pull_request.base.ref == 'master' &&
-      github.event.pull_request.head.ref == 'develop' &&
-      github.event.pull_request.head.repo.full_name == github.repository
     outputs:
       version: ${{ steps.version.outputs.version }}
       tag: ${{ steps.version.outputs.tag }}
@@ -34,11 +37,10 @@ jobs:
       previous_tag: ${{ steps.version.outputs.previous_tag }}
       existing_tag: ${{ steps.version.outputs.existing_tag }}
     steps:
-      - name: Check out merge commit
+      - name: Check out source
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ github.event.pull_request.merge_commit_sha }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -55,18 +57,17 @@ jobs:
     needs: prepare
     env:
       SINO_CODE_APP_VERSION: ${{ needs.prepare.outputs.version }}
-      SINO_CODE_UPDATE_CHANNEL: stable
-      RELEASE_CHANNEL: stable
+      SINO_CODE_UPDATE_CHANNEL: ${{ env.RELEASE_CHANNEL }}
+      RELEASE_CHANNEL: ${{ env.RELEASE_CHANNEL }}
       CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
       APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
       APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
       CSC_FOR_PULL_REQUEST: 'true'
     steps:
-      - name: Check out merge commit
+      - name: Check out source
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ github.event.pull_request.merge_commit_sha }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -138,15 +139,14 @@ jobs:
     needs: prepare
     env:
       SINO_CODE_APP_VERSION: ${{ needs.prepare.outputs.version }}
-      SINO_CODE_UPDATE_CHANNEL: stable
-      RELEASE_CHANNEL: stable
+      SINO_CODE_UPDATE_CHANNEL: ${{ env.RELEASE_CHANNEL }}
+      RELEASE_CHANNEL: ${{ env.RELEASE_CHANNEL }}
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
     steps:
-      - name: Check out merge commit
+      - name: Check out source
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ github.event.pull_request.merge_commit_sha }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -177,15 +177,14 @@ jobs:
     needs: prepare
     env:
       SINO_CODE_APP_VERSION: ${{ needs.prepare.outputs.version }}
-      SINO_CODE_UPDATE_CHANNEL: stable
-      RELEASE_CHANNEL: stable
+      SINO_CODE_UPDATE_CHANNEL: ${{ env.RELEASE_CHANNEL }}
+      RELEASE_CHANNEL: ${{ env.RELEASE_CHANNEL }}
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
     steps:
-      - name: Check out merge commit
+      - name: Check out source
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ github.event.pull_request.merge_commit_sha }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -216,7 +215,7 @@ jobs:
             dist/latest-linux.yml
 
   publish:
-    name: Publish GitHub Release and R2
+    name: Publish GitHub Release
     runs-on: ubuntu-latest
     needs:
       - prepare
@@ -229,21 +228,13 @@ jobs:
       RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
       RELEASE_NAME: ${{ needs.prepare.outputs.release_name }}
       PREVIOUS_TAG: ${{ needs.prepare.outputs.previous_tag }}
-      RELEASE_CHANNEL: stable
-      SINO_CODE_UPDATE_CHANNEL: stable
-      R2_BUCKET: ${{ secrets.R2_BUCKET }}
-      R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
-      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
-      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-      R2_PUBLIC_BASE_URL: ${{ secrets.R2_PUBLIC_BASE_URL }}
-      R2_RELEASE_PREFIX: ${{ secrets.R2_RELEASE_PREFIX }}
+      RELEASE_CHANNEL: ${{ env.RELEASE_CHANNEL }}
+      SINO_CODE_UPDATE_CHANNEL: ${{ env.RELEASE_CHANNEL }}
     steps:
-      - name: Check out merge commit
+      - name: Check out source
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ github.event.pull_request.merge_commit_sha }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -303,7 +294,7 @@ jobs:
             echo
             echo "- Release version: \`${RELEASE_VERSION}\`"
             echo "- Release channel: \`${RELEASE_CHANNEL}\`"
-            echo "- Branch: \`master\`"
+            echo "- Ref: \`${GITHUB_REF_NAME}\`"
             echo "- Commit: \`${GITHUB_SHA::7}\`"
             echo "- macOS: Developer ID signed and notarized"
             echo "- Platforms: macOS arm64/x64, Windows x64, Linux x64"
@@ -331,16 +322,22 @@ jobs:
       - name: Create or update draft GitHub Release
         run: |
           set -euo pipefail
+          release_flags=(--draft)
+          if [[ "${RELEASE_CHANNEL}" == "frontier" ]]; then
+            release_flags+=(--prerelease)
+          fi
+
           if gh release view "${TAG_NAME}" > /dev/null 2>&1; then
             gh release edit "${TAG_NAME}" \
               --title "${RELEASE_NAME}" \
-              --notes-file release-notes.md
+              --notes-file release-notes.md \
+              "${release_flags[@]}"
           else
             gh release create "${TAG_NAME}" \
-              --draft \
               --title "${RELEASE_NAME}" \
               --notes-file release-notes.md \
-              --verify-tag
+              --verify-tag \
+              "${release_flags[@]}"
           fi
 
       - name: Upload GitHub Release assets
@@ -359,19 +356,18 @@ jobs:
 
           gh release upload "${TAG_NAME}" "${assets[@]}" --clobber
 
-      - name: Upload release archive to R2
+      - name: Publish GitHub Release
         run: |
           set -euo pipefail
-          node ./scripts/publish-r2.mjs upload --platform mac --dist release-artifacts --tag "${TAG_NAME}" --channel "${RELEASE_CHANNEL}"
-          node ./scripts/publish-r2.mjs upload --platform win --dist release-artifacts --tag "${TAG_NAME}" --channel "${RELEASE_CHANNEL}"
-          node ./scripts/publish-r2.mjs upload --platform linux --dist release-artifacts --tag "${TAG_NAME}" --channel "${RELEASE_CHANNEL}"
 
-      - name: Promote R2 latest
-        run: >
-          node ./scripts/publish-r2.mjs promote
-          --tag "${TAG_NAME}"
-          --channel "${RELEASE_CHANNEL}"
-          --platforms mac,win,linux
+          release_id="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG_NAME}" --jq .id)"
+          if [[ "${RELEASE_CHANNEL}" == "frontier" ]]; then
+            jq -n '{ draft: false, prerelease: true }' > release-state.json
+          else
+            jq -n '{ draft: false, prerelease: false, make_latest: "true" }' > release-state.json
+          fi
 
-      - name: Publish GitHub Release
-        run: gh release edit "${TAG_NAME}" --draft=false --prerelease=false --latest
+          gh api \
+            --method PATCH \
+            "repos/${GITHUB_REPOSITORY}/releases/${release_id}" \
+            --input release-state.json

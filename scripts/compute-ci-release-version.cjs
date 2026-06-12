@@ -75,7 +75,18 @@ function computeReleaseVersion({ allTags = [], headTags = [], packageVersion }) 
   }
 
   const latest = newestSemverTag(allTags)
-  const base = latest || parseSemverVersion(packageVersion)
+  if (!latest) {
+    const base = parseSemverVersion(packageVersion)
+    return {
+      version: base.version,
+      tag: `v${base.version}`,
+      releaseName: `${PRODUCT_NAME} ${base.version}`,
+      previousTag: '',
+      existingTag: false
+    }
+  }
+
+  const base = latest
   const version = `${base.major}.${base.minor}.${base.patch + 1}`
   return {
     version,

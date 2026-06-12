@@ -26,8 +26,6 @@
     "release:all": "bash ./scripts/release-mac.sh",
     "release:mac": "bash ./scripts/release-mac.sh",
     "release:win": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/release-win.ps1",
-    "r2:upload": "node ./scripts/publish-r2.mjs upload",
-    "r2:promote": "node ./scripts/publish-r2.mjs promote",
     "postinstall": "node ./scripts/postinstall.cjs",
     "verify:apple": "node ./scripts/verify-apple-signing.cjs",
     "preview": "electron-vite preview",
@@ -88,6 +86,6 @@
   "homepage": "https://sino.xuya.dev",
   "repository": {
     "type": "git",
-    "url": "https://github.com/xuyadev/Sino-Code.git"
+    "url": "https://github.com/xuya-dev/Sino-Code.git"
   }
 }

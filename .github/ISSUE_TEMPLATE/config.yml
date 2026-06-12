@@ -4,5 +4,5 @@ contact_links:
     url: mailto:security@sino.xuya.dev
     about: Please report security issues privately instead of opening a public issue.
   - name: Contribution guide
-    url: https://github.com/xuyadev/Sino-Code/blob/master/docs/CONTRIBUTING.md
+    url: https://github.com/xuya-dev/Sino-Code/blob/main/docs/CONTRIBUTING.md
     about: Read the contribution workflow and validation expectations before opening a PR.

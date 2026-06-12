@@ -23,7 +23,7 @@ type ReleaseVersionModule = {
 const releaseVersion = require('../../scripts/compute-ci-release-version.cjs') as ReleaseVersionModule
 
 describe('CI release version computation', () => {
-  it('bumps package.json patch version when no release tags exist', () => {
+  it('uses package.json version when no release tags exist', () => {
     expect(
       releaseVersion.computeReleaseVersion({
         allTags: [],
@@ -31,9 +31,9 @@ describe('CI release version computation', () => {
         packageVersion: '0.1.0'
       })
     ).toEqual({
-      version: '0.1.1',
-      tag: 'v0.1.1',
-      releaseName: 'Sino Code 0.1.1',
+      version: '0.1.0',
+      tag: 'v0.1.0',
+      releaseName: 'Sino Code 0.1.0',
       previousTag: '',
       existingTag: false
     })

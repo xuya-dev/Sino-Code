@@ -43,21 +43,48 @@ const hasNotaryToolCredentials = Boolean(
     (process.env.APPLE_API_KEY || process.env.APPLE_API_KEY_BASE64)
 )
 
-const r2PublicBaseUrl = (process.env.R2_PUBLIC_BASE_URL || 'https://sino.xuya.dev/api/r2')
-  .trim()
-  .replace(/\/+$/, '')
-const r2ReleasePrefix = (process.env.R2_RELEASE_PREFIX || 'sino-code')
-  .trim()
-  .replace(/^\/+|\/+$/g, '')
 const updateChannel = normalizeUpdateChannel(process.env.SINO_CODE_UPDATE_CHANNEL || 'stable')
-const genericUpdateUrl = `${r2PublicBaseUrl}/${r2ReleasePrefix}/channels/${updateChannel}/latest/`
 const releaseAppVersion = (process.env.SINO_CODE_APP_VERSION || '').trim()
 const artifactVersion = releaseAppVersion || '${version}'
+const githubRepo = resolveGithubRepo()
 
 function normalizeUpdateChannel(raw) {
   const value = String(raw || '').trim()
   if (value === 'stable' || value === 'frontier') return value
   throw new Error(`SINO_CODE_UPDATE_CHANNEL must be "stable" or "frontier", got: ${raw}`)
+}
+
+function normalizeGithubOwnerRepo(raw) {
+  let value = String(raw || '').trim()
+  if (!value) return null
+  if (value.startsWith('github:')) value = value.slice('github:'.length).trim()
+  const ssh = value.match(/^git@github\.com:([\w.-]+\/[\w.-]+?)(?:\.git)?$/i)
+  if (ssh?.[1]) return ssh[1].replace(/\.git$/i, '').replace(/^\/+|\/+$/g, '')
+  const https = value.match(/github\.com\/([\w.-]+\/[\w.-]+?)(?:\.git)?(?:$|[#/])/i)
+  if (https?.[1]) return https[1].replace(/\.git$/i, '').replace(/^\/+|\/+$/g, '')
+  if (/^[\w.-]+\/[\w.-]+$/.test(value)) return value
+  return null
+}
+
+function resolveGithubRepo() {
+  const envRepo = normalizeGithubOwnerRepo(process.env.SINO_CODE_GITHUB_REPO)
+  let packageRepo = null
+  try {
+    const pkg = JSON.parse(readFileSync(join(__dirname, 'package.json'), 'utf8'))
+    const repository = pkg.repository
+    const raw =
+      typeof repository === 'string'
+        ? repository
+        : repository && typeof repository === 'object'
+          ? String(repository.url || '')
+          : ''
+    packageRepo = normalizeGithubOwnerRepo(raw)
+  } catch {
+    packageRepo = null
+  }
+  const slug = envRepo || packageRepo || 'xuya-dev/Sino-Code'
+  const [owner, repo] = slug.split('/', 2)
+  return { owner, repo }
 }
 
 if (releaseAppVersion && !/^\d+\.\d+\.\d+$/.test(releaseAppVersion)) {
@@ -100,8 +127,11 @@ module.exports = {
   artifactName: `Sino-Code-${artifactVersion}-\${os}-\${arch}.\${ext}`,
   publish: [
     {
-      provider: 'generic',
-      url: genericUpdateUrl
+      provider: 'github',
+      owner: githubRepo.owner,
+      repo: githubRepo.repo,
+      channel: 'latest',
+      releaseType: updateChannel === 'frontier' ? 'prerelease' : 'release'
     }
   ],
   afterPack: './scripts/after-pack.cjs',

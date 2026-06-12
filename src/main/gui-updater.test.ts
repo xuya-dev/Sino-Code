@@ -33,6 +33,11 @@ function createUpdater(): MockUpdater {
 beforeEach(() => {
   vi.useFakeTimers()
   vi.resetModules()
+  delete process.env.SINO_CODE_UPDATE_CHANNEL
+  delete process.env.SINO_CODE_UPDATE_URL
+  delete process.env.SINO_CODE_UPDATE_URL_STABLE
+  delete process.env.SINO_CODE_UPDATE_URL_FRONTIER
+  delete process.env.SINO_CODE_GITHUB_REPO
   updater = createUpdater()
   nativeUpdater = new EventEmitter()
   vi.doMock('electron', () => ({
@@ -60,6 +65,34 @@ afterEach(() => {
 })
 
 describe('installGuiUpdate', () => {
+  it('configures the GitHub release feed by default', async () => {
+    const module = await import('./gui-updater')
+
+    module.initializeGuiUpdater(() => null, () => 'stable')
+
+    expect(updater.setFeedURL).toHaveBeenCalledWith({
+      provider: 'github',
+      owner: 'xuya-dev',
+      repo: 'Sino-Code',
+      channel: 'latest'
+    })
+    expect(updater.allowPrerelease).toBe(false)
+  })
+
+  it('keeps custom generic feeds as an explicit override', async () => {
+    process.env.SINO_CODE_UPDATE_URL = 'https://updates.example.com/{channel}'
+    const module = await import('./gui-updater')
+
+    module.initializeGuiUpdater(() => null, () => 'frontier')
+    module.setGuiUpdateChannel('frontier')
+
+    expect(updater.setFeedURL).toHaveBeenLastCalledWith({
+      provider: 'generic',
+      url: 'https://updates.example.com/frontier/'
+    })
+    expect(updater.allowPrerelease).toBe(true)
+  })
+
   it('waits for managed runtime cleanup before asking the updater to quit and install', async () => {
     const module = await import('./gui-updater')
     let finishCleanup = (): void => {

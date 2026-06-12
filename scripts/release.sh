@@ -9,8 +9,7 @@ set -euo pipefail
 # The legacy --all flag is kept as a macOS-only alias.
 #
 #   bash ./scripts/release-mac.sh              # or bash ./scripts/release.sh
-#   bash ./scripts/release.sh --r2
-#   .\scripts\release-win.ps1 -Tag v0.1.3 -R2 -PromoteR2
+#   .\scripts\release-win.ps1 -Tag v0.1.3 -Publish
 #
 # =============================================================================
 
