@@ -608,7 +608,7 @@ async function ensureDragonRuntime(settings: AppSettingsV1): Promise<void> {
   if (!hasApiKey) {
     throw runtimeJsonError(
       'missing_api_key',
-      'A model provider API key is required before the GUI can start Dragon.'
+      'A model provider API key is required before the app can start Dragon.'
     )
   }
   if (!runtime.autoStart) {

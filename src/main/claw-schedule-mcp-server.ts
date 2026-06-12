@@ -104,7 +104,7 @@ export async function runClawScheduleMcpServerFromArgv(argv: string[]): Promise<
         ? 'Legacy alias. Create a scheduled task in Sino Code. Supports one-time (`at`), daily, or interval schedules.'
         : 'Create a scheduled task in Sino Code. Supports one-time (`at`), daily, or interval schedules.',
       inputSchema: {
-        title: z.string().min(1).describe('Short task title shown in the GUI'),
+        title: z.string().min(1).describe('Short task title shown in Sino Code'),
         prompt: z.string().min(1).describe('The prompt/instruction the agent should run at schedule time'),
         schedule_kind: z.enum(['at', 'daily', 'interval']).describe('Schedule type'),
         at_time: z.string().optional().describe('ISO 8601 timestamp with timezone offset, required when schedule_kind is `at`'),

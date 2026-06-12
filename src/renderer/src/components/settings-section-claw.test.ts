@@ -19,7 +19,7 @@ const labels: Record<string, string> = {
   clawDefaultWorkspace: 'Default phone workspace',
   clawDefaultWorkspaceDesc: 'Default phone workspace description',
   clawDefaultWorkspacePlaceholder: 'Inherit {{path}}',
-  clawDefaultWorkspaceReset: 'Use GUI default',
+  clawDefaultWorkspaceReset: 'Use app default',
   browse: 'Browse',
   clawManageAgents: 'Connected phone agents',
   clawManageAgentsEmpty: 'No phone agents',

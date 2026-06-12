@@ -590,7 +590,7 @@ async function waitForWeixinLogin(params: JsonRecord): Promise<JsonRecord> {
       case 'need_verifycode':
         return {
           connected: false,
-          message: '微信要求输入手机端验证码。当前 GUI 登录流程暂不支持验证码，请重新生成二维码后再试。'
+          message: '微信要求输入手机端验证码。当前应用登录流程暂不支持验证码，请重新生成二维码后再试。'
         }
       case 'expired':
         activeLogins.delete(sessionKey)
@@ -1058,7 +1058,7 @@ async function startBridgeServer(): Promise<string> {
     void handleBridgeRequest(request, response)
   })
   await listen(server, port)
-  logInfo('weixin-bridge', `started built-in GUI WeChat bridge on port ${port}`)
+  logInfo('weixin-bridge', `started built-in app WeChat bridge on port ${port}`)
   await startWeixinChannels({})
   return resolveRpcUrl()
 }
@@ -1103,7 +1103,7 @@ export async function sendWeixinBridgeMessage(options: {
     return { ok: true as const, messageId: result.messageId }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    logError('weixin-bridge', 'Failed to send WeChat message from GUI.', {
+    logError('weixin-bridge', 'Failed to send WeChat message from app.', {
       message,
       accountId,
       to

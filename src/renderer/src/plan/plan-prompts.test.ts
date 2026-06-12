@@ -17,7 +17,7 @@ describe('plan-prompts', () => {
       workspaceRoot: '/tmp/app',
       planRelativePath: '.sinocode/plan/add-auth.md'
     })
-    expect(prompt).toContain('The GUI will save your answer')
+    expect(prompt).toContain('Sino Code will save your answer')
     expect(prompt).toContain('create_plan')
     expect(prompt).toContain('Do not call any other tools')
     expect(prompt).toContain('<gui_plan>')
@@ -65,7 +65,7 @@ describe('plan-prompts', () => {
 
   it('builds execution prompts that point at the plan file', () => {
     expect(buildPlanBuildPrompt('.sinocode/plan/add-auth.md')).toContain(
-      'Please read and execute the GUI plan file at `.sinocode/plan/add-auth.md`'
+      'Please read and execute the app-managed plan file at `.sinocode/plan/add-auth.md`'
     )
   })
 

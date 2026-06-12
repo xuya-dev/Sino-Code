@@ -366,7 +366,7 @@ function createUserInputTool(name: string): LocalTool {
   }
   return LocalToolHost.defineTool({
     name,
-    description: 'Ask the GUI user a structured question and wait for the answer.',
+    description: 'Ask the app user a structured question and wait for the answer.',
     toolKind: 'tool_call',
     inputSchema: {
       type: 'object',
@@ -403,7 +403,7 @@ function createUserInputTool(name: string): LocalTool {
     execute: async (args, context) => {
       if (!context.awaitUserInput) {
         return {
-          output: { error: 'GUI user input is not available in this runtime context' },
+          output: { error: 'App user input is not available in this runtime context' },
           isError: true
         }
       }

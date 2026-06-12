@@ -15,7 +15,7 @@
 
 ## About This Project
 
-Sino Code is a local desktop workbench for Chinese AI models, forked from the DeepSeek GUI project. We extended the original DeepSeek-only agent workbench into a **universal desktop client that supports all Chinese AI models**, with built-in presets for DeepSeek, Zhipu AI, MiniMax, Moonshot (Kimi), Alibaba Cloud (Bailian), Tencent (TokenHub / Coding Plan), and Xiaomi — each offering multiple endpoints like Coding Plan, pay-as-you-go, and Token Plan.
+Sino Code is a local desktop workbench for Chinese AI models. It brings the Dragon local agent runtime, model provider management, coding tasks, writing assistance, IM integration, and scheduled tasks into one universal desktop client, with built-in presets for DeepSeek, Zhipu AI, MiniMax, Moonshot (Kimi), Alibaba Cloud (Bailian), Tencent (TokenHub / Coding Plan), and Xiaomi — each offering multiple endpoints like Coding Plan, pay-as-you-go, and Token Plan.
 
 Sino Code uses Dragon as the only runtime and turns the terminal agent experience into an easier, longer-lived app: choose a workspace, start a task, watch reasoning and tool calls stream in, review file changes, and approve sensitive actions when needed.
 
@@ -34,7 +34,7 @@ Dragon makes token economy the default behavior of the agent loop, not a cleanup
 | **Cache-first agent loop** | Stable system prompts, tool schemas, and immutable prefixes make DeepSeek native cache hits more likely, so long sessions do not keep paying for the same background. |
 | **Tool context on demand** | When MCP catalogs are large, Dragon can search for relevant tools first, then describe and call the target tool instead of sending every tool schema on every turn. |
 | **Context hygiene** | Long tool results, long arguments, base64 payloads, repeated tool loops, and low-value history are bounded while code, paths, errors, decisions, and open tasks are preserved. |
-| **Visible usage payback** | Runtime telemetry tracks cache hit/miss, token usage, and estimated savings; the GUI surfaces Token economy savings so cost return is observable over time. |
+| **Visible usage payback** | Runtime telemetry tracks cache hit/miss, token usage, and estimated savings; the app surfaces Token economy savings so cost return is observable over time. |
 
 The result: Dragon is built for real project work with long tasks, long sessions, and many tools. It keeps the model's attention on high-value context, helping the same API budget produce more useful progress.
 
@@ -79,7 +79,7 @@ The result: Dragon is built for real project work with long tasks, long sessions
 The only active local agent runtime in Sino-Code today is
 **Dragon** (shipped under `Dragon/`), a self-contained
 TypeScript package that boots a local HTTP/SSE server as the
-single boundary between the GUI and the agent loop.
+single boundary between the desktop app and the agent loop.
 
 The name Dragon is inspired by the great fish in Zhuangzi's line,
 "In the northern sea there is a fish; its name is Dragon." The idea is
@@ -120,7 +120,7 @@ Dragon's larger agent capabilities are controlled by feature flags:
 `capabilities.attachments` enables image attachments with text-model fallback, `capabilities.memory`
 enables cross-session recall, and `capabilities.subagents` allows
 budgeted delegated child runs. `Dragon run`, `Dragon chat`, and `Dragon exec`
-can run without the GUI. The GUI reads `/v1/runtime/info` and
+can run without the desktop app. Sino Code reads `/v1/runtime/info` and
 `/v1/runtime/tools` in Settings to show what is actually available.
 These capabilities are off by config or limited by model capability
 until explicitly enabled; examples and troubleshooting live in
@@ -189,7 +189,7 @@ A dedicated Markdown writing workbench that keeps writing files, save state, and
 Background automation and IM integration, so Dragon can keep handling phone messages and scheduled jobs outside normal desktop chat.
 
 - Configure dedicated agents for Feishu / Lark / WeChat and other channels, each with its own profile, default model, and workspace.
-- Every IM agent gets its own thread, so you can debug replies and tool calls directly in the GUI.
+- Every IM agent gets its own thread, so you can debug replies and tool calls directly in the app.
 - Local webhook / relay support for team workflows and personal automation.
 - Scheduled tasks can run once, daily, on an interval, or manually. Each task creates a dedicated Dragon thread and sends its configured prompt.
 
@@ -263,7 +263,7 @@ Settings manages:
 - Auto-start for the local runtime, plus optional custom runtime path.
 - Tool approval policy and filesystem access mode.
 - Default workspace, language, theme, font size, and completion notifications.
-- GUI updates and local error logs.
+- App updates and local error logs.
 - Skill creation, Skill folders, and MCP config editing.
 - Connect phone automation, Feishu / Lark / WeChat connections, webhook / relay settings, and scheduled tasks.
 
@@ -282,8 +282,8 @@ Write mode extends Sino Code from a code/chat workbench into a long-form writing
 
 - Markdown live editing: openhanako inspired the CodeMirror decorations approach where the active line stays editable as Markdown source while inactive lines render headings, tasks, images, dividers, and tables through widgets.
 - Selection inline agent: openhanako inspired the selection-capture and floating-input interaction, so selected text can be sent with file path, line numbers, and bounded original text as structured context.
-- AI session isolation: Write uses Dragon threads, but the GUI keeps a local write thread registry per writing space so write conversations do not pollute Code / Connect phone sidebars.
-- Text completion: writing completion bypasses the local Dragon serve runtime (**Dragon** is the bundled local HTTP/SSE agent runtime, the single boundary between the GUI and the agent loop — see the [Runtime: Dragon](#runtime-Dragon) section above for details) and calls the Chinese AI model FIM Completion API directly for low-latency ghost text. Short completion uses a short debounce, small token budget, and strict local filtering; inspiration completion uses a longer pause, larger token budget, and only runs at line ends or paragraph boundaries. Before completion, the app builds a short-TTL lightweight index over Markdown / text files in the writing space, retrieves cross-document snippets with BM25 + keyword matching, and injects them as a hidden Markdown comment so terminology, facts, and style stay consistent.
+- AI session isolation: Write uses Dragon threads, but the app keeps a local write thread registry per writing space so write conversations do not pollute Code / Connect phone sidebars.
+- Text completion: writing completion bypasses the local Dragon serve runtime (**Dragon** is the bundled local HTTP/SSE agent runtime, the single boundary between the desktop app and the agent loop — see the [Runtime: Dragon](#runtime-Dragon) section above for details) and calls the Chinese AI model FIM Completion API directly for low-latency ghost text. Short completion uses a short debounce, small token budget, and strict local filtering; inspiration completion uses a longer pause, larger token budget, and only runs at line ends or paragraph boundaries. Before completion, the app builds a short-TTL lightweight index over Markdown / text files in the writing space, retrieves cross-document snippets with BM25 + keyword matching, and injects them as a hidden Markdown comment so terminology, facts, and style stay consistent.
 
 ---
 
@@ -328,7 +328,7 @@ Dragon data lives under `~/.sinocode/dragon` or the configured Dragon data dir. 
 
 ## Updates
 
-- For regular users: check GUI updates in Settings or download the latest installer from [GitHub Releases](https://github.com/xuyadev/Sino-Code/releases).
+- For regular users: check app updates in Settings or download the latest installer from [GitHub Releases](https://github.com/xuyadev/Sino-Code/releases).
 
 ## Contributing
 
@@ -364,7 +364,7 @@ For the full development workflow, see [DEVELOPMENT.md](./docs/DEVELOPMENT.md).
 
 | Doc | Contents |
 | --- | --- |
-| [docs/Dragon-architecture.en.md](docs/Dragon-architecture.en.md) | Single-Dragon runtime plan, GUI removal scope, HTTP/SSE contract, and legacy agent retirement notes |
+| [docs/Dragon-architecture.en.md](docs/Dragon-architecture.en.md) | Single-Dragon runtime plan, desktop app removal scope, HTTP/SSE contract, and legacy agent retirement notes |
 | [docs/Dragon-cache-optimization.en.md](docs/Dragon-cache-optimization.en.md) | Dragon cache optimization, token economy, MCP search, tool-output compaction, and usage savings |
 | [docs/Dragon-contributing.en.md](docs/Dragon-contributing.en.md) | Dragon contribution guide: hexagonal architecture, design patterns (Ports & Adapters / Functional Core Imperative Shell / event sourcing / explicit DI / composition root), four typical PR scenarios |
 | [Dragon/README.md](Dragon/README.md) | Dragon package: CLI, env, data dir, HTTP API |
@@ -377,7 +377,7 @@ For the full development workflow, see [DEVELOPMENT.md](./docs/DEVELOPMENT.md).
 
 ## Thanks
 
-This project is a fork of [DeepSeek GUI](https://github.com/XingYu-Zhong/DeepSeek-GUI). We thank the original author [@XingYu-Zhong](https://github.com/XingYu-Zhong) and all contributors for laying the solid foundation. If the upstream project is helpful to you too, please head over to <https://github.com/XingYu-Zhong/DeepSeek-GUI> and give the original author a Star ⭐.
+Early Sino Code development built on parts of [DeepSeek GUI](https://github.com/XingYu-Zhong/DeepSeek-GUI). We thank the original author [@XingYu-Zhong](https://github.com/XingYu-Zhong) and all contributors for laying the solid foundation. If the upstream project is helpful to you too, please head over to <https://github.com/XingYu-Zhong/DeepSeek-GUI> and give the original author a Star ⭐.
 
 ## License
 

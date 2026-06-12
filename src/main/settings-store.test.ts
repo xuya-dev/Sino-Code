@@ -7,7 +7,7 @@ import { DEFAULT_GUI_UPDATE_CHANNEL } from '../shared/gui-update'
 import { JsonSettingsStore } from './settings-store'
 
 describe('JsonSettingsStore', () => {
-  it('defaults GUI updates to the stable channel for new settings', async () => {
+  it('defaults app updates to the stable channel for new settings', async () => {
     const userDataDir = await mkdtemp(join(tmpdir(), 'sino-code-settings-'))
 
     const store = new JsonSettingsStore(userDataDir)

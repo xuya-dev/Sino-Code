@@ -1,5 +1,5 @@
 ﻿import type { Dispatch, ReactElement, SetStateAction } from 'react'
-import { Bot, ChevronLeft, Globe, Keyboard, PencilLine, Plug, Settings, Smartphone } from 'lucide-react'
+import { ChevronLeft, Globe, Keyboard, PencilLine, Plug, Server, Settings, Smartphone } from 'lucide-react'
 
 type SettingsCategory = 'general' | 'providers' | 'write' | 'agents' | 'shortcuts' | 'claw'
 
@@ -48,7 +48,7 @@ export function SettingsSidebar({
           {t('write')}
         </button>
         <button type="button" className={catCls('agents')} onClick={() => setCategory('agents')}>
-          <Bot className="h-4 w-4 shrink-0 opacity-70" strokeWidth={1.75} />
+          <Server className="h-4 w-4 shrink-0 opacity-70" strokeWidth={1.75} />
           {t('agents')}
         </button>
         <button type="button" className={catCls('shortcuts')} onClick={() => setCategory('shortcuts')}>

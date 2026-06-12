@@ -256,7 +256,7 @@ function extractHttpStatus(raw: string): number | null {
 function sanitizeUpdaterError(raw: string, channel: GuiUpdateChannel): string {
   const message = raw.trim()
   if (!message) {
-    return `Could not read GUI update metadata for the ${channel} channel. Open the download page instead.`
+    return `Could not read app update metadata for the ${channel} channel. Open the download page instead.`
   }
 
   if (/Invalid release object path\./i.test(message)) {
@@ -353,7 +353,7 @@ async function runScheduledGuiUpdateCheck(): Promise<void> {
       await writeLastScheduledCheckAt(nowMs)
       await checkGuiUpdate()
     } catch (error) {
-      console.warn('[sino-code updater] scheduled GUI update check failed:', error)
+      console.warn('[sino-code updater] scheduled app update check failed:', error)
     } finally {
       backgroundCheckPromise = null
       void scheduleNextBackgroundCheck()
@@ -746,7 +746,7 @@ export async function downloadGuiUpdate(channel?: GuiUpdateChannel): Promise<Gui
           code: checked.manualOnly ? 'unsupported' : 'unknown',
           message: checked.manualOnly
             ? unsupportedMessage()
-            : 'No downloadable GUI update is available.'
+            : 'No downloadable app update is available.'
         }
       }
     }

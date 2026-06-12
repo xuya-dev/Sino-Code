@@ -6,7 +6,7 @@ export const WRITE_CONTEXT_HEADING = '[写作上下文]'
 export const WRITE_QUOTE_HEADING = '[引用片段]'
 
 const WRITE_ASSISTANT_INTERACTION_RULE =
-  '交互限制: 当前 GUI 无法提交 request_user_input 的 HTTP 响应；需要更多信息时，直接用普通文本向用户提问，不要调用 request_user_input。'
+  '交互限制: 当前应用无法提交 request_user_input 的 HTTP 响应；需要更多信息时，直接用普通文本向用户提问，不要调用 request_user_input。'
 
 export type WriteQuotedSelection = {
   id: string

@@ -43,7 +43,7 @@ export type ModelRequest = {
   tools: ModelToolSpec[]
   /**
    * Optional loop-level requirement. The agent loop uses this to keep
-   * GUI-owned workflows, such as plan creation, tied to a concrete tool
+   * App-managed workflows, such as plan creation, tied to a concrete tool
    * result even when a provider ignores tool-use instructions.
    */
   requiredToolName?: string

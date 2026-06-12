@@ -176,7 +176,7 @@ export function buildClawRuntimePrompt(
     instructions.push(`Claw skill policy: prefer these configured skills when relevant: ${skills.defaultNames.join(', ')}.`)
   }
   if (skills.extraDirs.length > 0) {
-    instructions.push(`Additional local skill directories configured in the GUI: ${skills.extraDirs.join(', ')}.`)
+    instructions.push(`Additional local skill directories configured in Sino Code: ${skills.extraDirs.join(', ')}.`)
   }
   const prefix = skills.promptPrefix.trim()
   if (prefix) instructions.push(prefix)
@@ -196,7 +196,7 @@ export function buildScheduleRuntimePrompt(
     instructions.push(`Schedule skill policy: prefer these configured skills when relevant: ${schedule.skills.defaultNames.join(', ')}.`)
   }
   if (schedule.skills.extraDirs.length > 0) {
-    instructions.push(`Additional local skill directories configured in the GUI: ${schedule.skills.extraDirs.join(', ')}.`)
+    instructions.push(`Additional local skill directories configured in Sino Code: ${schedule.skills.extraDirs.join(', ')}.`)
   }
   const prefix = schedule.promptPrefix.trim()
   if (prefix) instructions.push(prefix)
@@ -224,7 +224,8 @@ export function unwrapClawRuntimePromptForDisplay(text: string): string {
     prefix.includes(CLAW_MANAGED_INSTRUCTIONS_HEADING) ||
     prefix.includes(CLAW_IM_AGENT_INSTRUCTIONS_HEADING) ||
     prefix.includes('Claw skill policy:') ||
-    prefix.includes('Additional local skill directories configured in the GUI:')
+    prefix.includes('Additional local skill directories configured in the GUI:') ||
+    prefix.includes('Additional local skill directories configured in Sino Code:')
   if (!looksManaged) return text
   return text.slice(markerIndex + CLAW_CURRENT_USER_REQUEST_HEADING.length).trimStart()
 }

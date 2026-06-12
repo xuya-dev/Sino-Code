@@ -156,7 +156,7 @@ describe('write-thread-registry', () => {
   it('hydrates Reasonix write-context threads even when the session list reports the default workspace', () => {
     const leaked = {
       ...thread('reasonix-write-thread', '/Users/zxy/.sinocode/default_workspace'),
-      title: '[写作上下文] 交互限制：当前 GUI 无法提交 request_user_input'
+      title: '[写作上下文] 交互限制：当前应用无法提交 request_user_input'
     }
 
     const registry = hydrateWriteThreadRegistry(

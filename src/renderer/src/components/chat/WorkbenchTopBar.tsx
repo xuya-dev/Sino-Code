@@ -213,14 +213,14 @@ export function WorkbenchTopBar({
       }
       const installResult = await window.sinoCode.installGuiUpdate()
       if (!installResult.ok && typeof window.sinoCode?.logError === 'function') {
-        await window.sinoCode.logError('gui-update', 'Failed to install GUI update from workbench top bar', {
+        await window.sinoCode.logError('gui-update', 'Failed to install app update from workbench top bar', {
           version: guiUpdateAction.latestVersion,
           message: installResult.message
         })
       }
     } catch (error) {
       if (typeof window.sinoCode?.logError === 'function') {
-        await window.sinoCode.logError('gui-update', 'Failed to apply GUI update from workbench top bar', {
+        await window.sinoCode.logError('gui-update', 'Failed to apply app update from workbench top bar', {
           version: guiUpdateAction.latestVersion,
           message: error instanceof Error ? error.message : String(error)
         })
