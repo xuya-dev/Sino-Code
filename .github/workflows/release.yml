@@ -25,6 +25,7 @@ concurrency:
 env:
   NODE_VERSION: '22'
   RELEASE_CHANNEL: ${{ github.event.inputs.channel || 'stable' }}
+  SINO_CODE_UPDATE_CHANNEL: ${{ github.event.inputs.channel || 'stable' }}
 
 jobs:
   prepare:
@@ -57,8 +58,6 @@ jobs:
     needs: prepare
     env:
       SINO_CODE_APP_VERSION: ${{ needs.prepare.outputs.version }}
-      SINO_CODE_UPDATE_CHANNEL: ${{ env.RELEASE_CHANNEL }}
-      RELEASE_CHANNEL: ${{ env.RELEASE_CHANNEL }}
       CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
       APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
       APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
@@ -139,8 +138,6 @@ jobs:
     needs: prepare
     env:
       SINO_CODE_APP_VERSION: ${{ needs.prepare.outputs.version }}
-      SINO_CODE_UPDATE_CHANNEL: ${{ env.RELEASE_CHANNEL }}
-      RELEASE_CHANNEL: ${{ env.RELEASE_CHANNEL }}
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
     steps:
       - name: Check out source
@@ -177,8 +174,6 @@ jobs:
     needs: prepare
     env:
       SINO_CODE_APP_VERSION: ${{ needs.prepare.outputs.version }}
-      SINO_CODE_UPDATE_CHANNEL: ${{ env.RELEASE_CHANNEL }}
-      RELEASE_CHANNEL: ${{ env.RELEASE_CHANNEL }}
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
     steps:
       - name: Check out source
@@ -228,8 +223,6 @@ jobs:
       RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
       RELEASE_NAME: ${{ needs.prepare.outputs.release_name }}
       PREVIOUS_TAG: ${{ needs.prepare.outputs.previous_tag }}
-      RELEASE_CHANNEL: ${{ env.RELEASE_CHANNEL }}
-      SINO_CODE_UPDATE_CHANNEL: ${{ env.RELEASE_CHANNEL }}
     steps:
       - name: Check out source
         uses: actions/checkout@v4
