@@ -16,11 +16,13 @@ import {
   buildComposerModelMenuGroups,
   calculateFloatingMenuPlacement,
   calculateFloatingSubmenuPlacement,
-  composerReasoningEffortRequestValue
+  composerReasoningEffortRequestValue,
+  modelMenuItemLabel
 } from './FloatingComposerModelPicker'
 import { getGoalPanelDraftObjective } from './floating-composer-commands'
 import { useChatStore } from '../../store/chat-store'
 import { providerAutoComposerModelId } from '../../store/chat-store-helpers'
+import i18n from '../../i18n'
 import {
   buildComposerFileContextPrompt,
   filterWorkspaceFileMentionSuggestions,
@@ -273,8 +275,69 @@ describe('FloatingComposer model controls', () => {
       })
     )
 
-    expect(html).toContain('Zhipu AI / GLM 5.1')
+    expect(html).toContain('Z.ai / GLM 5.1')
     expect(html).not.toContain('>glm-5.1<')
+  })
+
+  it('uses bare model names for provider model menu rows', () => {
+    const providerAuto = providerAutoComposerModelId('zhipu')
+    const groups = buildComposerModelMenuGroups({
+      composerModelGroups: [
+        {
+          providerId: 'zhipu',
+          label: 'Zhipu AI',
+          modelIds: ['glm-5.1'],
+          modelLabels: {
+            'glm-5.1': 'GLM 5.1'
+          }
+        }
+      ],
+      modelOptions: ['auto', 'glm-5.1'],
+      isZh: false,
+      fallbackLabel: 'Models'
+    })
+
+    const zhipuGroup = groups[0]
+    expect(zhipuGroup).toBeDefined()
+    expect(zhipuGroup.modelIds).toEqual([providerAuto, 'glm-5.1'])
+    expect(modelMenuItemLabel(providerAuto, 'Auto', zhipuGroup)).toBe('AUTO')
+    expect(modelMenuItemLabel('glm-5.1', 'Auto', zhipuGroup)).toBe('GLM 5.1')
+    expect(modelMenuItemLabel('glm-5.1', 'Auto', zhipuGroup)).not.toContain('Zhipu AI /')
+  })
+
+  it('separates Chinese reasoning labels from provider model names', async () => {
+    const previousLanguage = i18n.language || 'en'
+    await i18n.changeLanguage('zh')
+    try {
+      const html = renderToStaticMarkup(
+        createElement(FloatingComposerModelPicker, {
+          compact: false,
+          mode: 'select',
+          composerModel: 'deepseek-v4-flash',
+          composerPickList: ['auto', 'deepseek-v4-flash'],
+          composerModelGroups: [
+            {
+              providerId: 'deepseek',
+              label: 'DeepSeek',
+              modelIds: ['deepseek-v4-flash'],
+              modelLabels: {
+                'deepseek-v4-flash': 'DeepSeek V4 Flash'
+              }
+            }
+          ],
+          composerReasoningEffort: 'max',
+          canChangeModel: true,
+          onComposerModelChange: () => undefined,
+          onComposerReasoningEffortChange: () => undefined
+        })
+      )
+
+      expect(html).toContain('深度求索 / DeepSeek V4 Flash')
+      expect(html).toContain('超高')
+      expect(html).not.toContain('Flash超高')
+    } finally {
+      await i18n.changeLanguage(previousLanguage)
+    }
   })
 
   it('keeps auto selectable in the fallback model group when no provider groups exist', () => {

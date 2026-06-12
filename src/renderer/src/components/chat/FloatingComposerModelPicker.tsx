@@ -75,7 +75,7 @@ type FloatingSubmenuPlacement = {
 type FloatingMenuAnchorRect = Pick<DOMRect, 'bottom' | 'right' | 'top'>
 type FloatingSubmenuAnchorRect = Pick<DOMRect, 'bottom' | 'left' | 'right' | 'top'>
 
-type ComposerModelMenuGroup = {
+export type ComposerModelMenuGroup = {
   providerId: string
   label: string
   modelIds: string[]
@@ -148,7 +148,7 @@ export function FloatingComposerModelPicker({
   const currentReasoningLabel = t(reasoningLabelKey(currentReasoning))
   const modelLabel = fullModelLabel(composerModel, t('autoLabel'), providerMenuGroups)
   const controlsTitle = reasoningEnabled
-    ? `${modelLabel} / ${currentReasoningLabel}`
+    ? `${modelLabel} · ${currentReasoningLabel}`
     : modelLabel
   const currentModel = composerModel.trim()
   const selectedProviderId = providerMenuGroups.find((group) =>
@@ -350,7 +350,7 @@ export function FloatingComposerModelPicker({
                 active={activeProviderId === group.providerId}
                 selected={selectedProviderId === group.providerId}
                 title={group.label}
-                subtitle={selectedModel ? fullModelLabel(selectedModel, t('autoLabel'), providerMenuGroups) : ''}
+                subtitle={selectedModel ? modelMenuItemLabel(selectedModel, t('autoLabel'), group) : ''}
                 onClick={() => setActiveProviderId(group.providerId)}
                 onMouseEnter={() => setActiveProviderId(group.providerId)}
               />
@@ -373,7 +373,7 @@ export function FloatingComposerModelPicker({
               <PickerRow
                 key={`${activeProviderGroup.providerId}:${id}`}
                 selected={currentModel === id}
-                title={fullModelLabel(id, t('autoLabel'), providerMenuGroups)}
+                title={modelMenuItemLabel(id, t('autoLabel'), activeProviderGroup)}
                 onClick={() => {
                   onComposerModelChange(id)
                   setMenuOpen(false)
@@ -419,8 +419,9 @@ export function FloatingComposerModelPicker({
             {modelLabel}
           </span>
           {reasoningEnabled ? (
-            <span className="shrink-0 text-[12px] font-semibold text-ds-faint">
-              {currentReasoningLabel}
+            <span className="inline-flex shrink-0 items-center gap-1 text-[12px] font-semibold text-ds-faint">
+              <span aria-hidden="true" className="font-normal opacity-70">·</span>
+              <span>{currentReasoningLabel}</span>
             </span>
           ) : null}
           <span className="mr-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-ds-faint">
@@ -455,10 +456,11 @@ export function FloatingComposerModelPicker({
         aria-label={t('composerModelControls')}
         title={t('composerModelControls')}
       >
-        <span className="min-w-0 whitespace-nowrap">{modelLabel}</span>
+        <span className="min-w-0 truncate whitespace-nowrap">{modelLabel}</span>
         {reasoningEnabled ? (
-          <span className="shrink-0 text-ds-faint">
-            {t(reasoningLabelKey(currentReasoning))}
+          <span className="inline-flex shrink-0 items-center gap-1 text-ds-faint">
+            <span aria-hidden="true" className="font-normal opacity-70">·</span>
+            <span>{currentReasoningLabel}</span>
           </span>
         ) : null}
         <ChevronDown className="h-3.5 w-3.5 shrink-0 text-ds-faint" strokeWidth={1.8} />
@@ -742,6 +744,17 @@ function fullModelLabel(
 
 function modelLabelForGroup(model: string, group: ComposerModelMenuGroup): string {
   return group.modelLabels?.[model]?.trim() || model
+}
+
+export function modelMenuItemLabel(
+  model: string,
+  autoLabel: string,
+  group: ComposerModelMenuGroup
+): string {
+  const providerId = providerIdFromComposerAutoModel(model.trim())
+  if (providerId) return 'AUTO'
+  if (!model.trim() || model.trim().toLowerCase() === 'auto') return autoLabel
+  return modelLabelForGroup(model, group)
 }
 
 function isUngroupedModelGroup(group: ComposerModelMenuGroup): boolean {

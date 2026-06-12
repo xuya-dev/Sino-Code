@@ -14,7 +14,8 @@ const labels: Record<string, string> = {
   agentsQuickSkill: 'Skills',
   agentsQuickMcp: 'MCP',
   agentsQuickPermissions: 'Permissions',
-  agents: 'Agents',
+  agents: 'Runtime',
+  runtimeSettings: 'Runtime',
   dragonProvider: 'Provider',
   dragonProviderDesc: 'Provider description',
   modelProviderEndpointFormat: 'Endpoint format',
@@ -24,31 +25,29 @@ const labels: Record<string, string> = {
   endpointFormatChatCompletions: '/v1/chat/completions',
   endpointFormatResponses: '/v1/responses',
   endpointFormatMessages: '/v1/messages',
-  dragonApiKey: 'Dragon API key',
-  dragonApiKeyDesc: 'Dragon API key description',
+  dragonApiKey: 'Provider API key',
+  dragonApiKeyDesc: 'Provider API key description',
   dragonApiKeyPlaceholder: 'Inherit API key',
   dragonApiKeyInherited: 'Inherited API key',
   dragonApiKeyMissing: 'Missing API key',
   dragonApiKeyOverride: 'Override API key',
-  dragonBaseUrl: 'Dragon base URL',
-  dragonBaseUrlDesc: 'Dragon base URL description',
+  dragonBaseUrl: 'Provider base URL',
+  dragonBaseUrlDesc: 'Provider base URL description',
   dragonBaseUrlPlaceholder: 'Inherit base URL',
   dragonBaseUrlOfficial: 'Official base URL',
   dragonBaseUrlInherited: 'Inherited base URL',
   dragonBaseUrlOverride: 'Override base URL',
-  dragonAssistantAdvanced: 'Assistant advanced settings',
-  dragonAssistantAdvancedDesc: 'Assistant advanced settings description',
+  dragonAssistantAdvanced: 'Runtime advanced settings',
+  dragonAssistantAdvancedDesc: 'Runtime advanced settings description',
   autoStart: 'Auto start',
   autoStartDesc: 'Auto start description',
   port: 'Port',
   portDesc: 'Port description',
-  dragonBinary: 'Dragon binary',
-  dragonBinaryDesc: 'Dragon binary description',
-  dragonBinaryPlaceholder: 'Bundled Dragon',
+  dragonBinary: 'Runtime binary',
+  dragonBinaryDesc: 'Runtime binary description',
+  dragonBinaryPlaceholder: 'Bundled runtime',
   dragonDataDir: 'Data dir',
   dragonDataDirDesc: 'Data dir description',
-  dragonModel: 'Model',
-  dragonModelDesc: 'Model description',
   dragonTokenEconomy: 'Token-saving mode',
   dragonTokenEconomyDesc: 'Token-saving mode description',
   dragonTokenEconomySavings: 'Saved {{tokens}} / {{cost}}',
@@ -114,12 +113,13 @@ const labels: Record<string, string> = {
   dragonToolStormThreshold: 'Tool storm threshold',
   dragonToolArgumentRepair: 'Tool argument repair',
   dragonToolArgumentRepairDesc: 'Tool argument repair description',
-  dragonDiagnostics: 'Dragon diagnostics',
+  dragonDiagnostics: 'Runtime status',
   dragonDiagnosticsAdvanced: 'Detailed diagnostics',
   dragonDiagnosticsAdvancedDesc: 'Detailed diagnostics description',
   dragonRuntimeCapabilities: 'Runtime capabilities',
   dragonRuntimeCapabilitiesDesc: 'Runtime capabilities description',
-  dragonRuntimeModel: 'Runtime model',
+  dragonRuntimeModel: 'Current model',
+  dragonRuntimeModelUnset: 'Not configured',
   dragonRuntimePid: 'Runtime PID',
   dragonDiagnosticsRefresh: 'Refresh diagnostics',
   dragonToolDiagnostics: 'Tool diagnostics',
@@ -304,7 +304,7 @@ function baseCtx(): Record<string, unknown> {
   }
 }
 
-describe('AgentsSettingsSection Dragon diagnostics smoke', () => {
+describe('AgentsSettingsSection runtime diagnostics smoke', () => {
   it('builds a single patch when adding and selecting a model provider', () => {
     const provider = defaultModelProviderSettings()
     const customProvider = {
@@ -414,7 +414,8 @@ describe('AgentsSettingsSection Dragon diagnostics smoke', () => {
   it('keeps advanced agent controls behind collapsed disclosures', () => {
     const html = renderToStaticMarkup(createElement(AgentsSettingsSection, { ctx: baseCtx() }))
 
-    expect(html).toContain('Assistant advanced settings')
+    expect(html).toContain('Runtime advanced settings')
+    expect(html).not.toContain('Model description')
     expect(html).toContain('Token-saving advanced settings')
     expect(html).toContain('MCP advanced settings')
     expect(html).not.toContain('<details open')
@@ -433,7 +434,7 @@ describe('AgentsSettingsSection Dragon diagnostics smoke', () => {
     const html = renderToStaticMarkup(createElement(AgentsSettingsSection, { ctx: baseCtx() }))
 
     expect(html).toContain('Current model context policy')
-    expect(html).toContain('auto')
+    expect(html).toContain('Not configured')
     expect(html).toContain('Fallback model config')
     expect(html).toContain('Fallback compaction thresholds')
   })
@@ -477,13 +478,80 @@ describe('AgentsSettingsSection Dragon diagnostics smoke', () => {
     expect(html).toContain('126,720')
   })
 
+  it('uses the selected provider route model for context when the runtime model is stale', () => {
+    const provider = defaultModelProviderSettings()
+    const html = renderToStaticMarkup(createElement(AgentsSettingsSection, {
+      ctx: {
+        ...baseCtx(),
+        form: {
+          claw: { skills: { extraDirs: ['/tmp/project/.agents/skills'] } },
+          provider: {
+            ...provider,
+            providers: [{
+              id: 'zhipu',
+              name: 'Zhipu',
+              apiKey: '',
+              baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
+              endpointFormat: 'chat_completions',
+              models: ['glm-5.1'],
+              mainModelId: 'glm-5.1',
+              modelDetails: {
+                'glm-5.1': {
+                  id: 'glm-5.1',
+                  name: 'GLM 5.1',
+                  maxContext: 128000
+                }
+              }
+            }]
+          }
+        },
+        dragon: {
+          ...defaultDragonRuntimeSettings(),
+          providerId: 'zhipu',
+          model: 'deepseek-v4-pro'
+        }
+      }
+    }))
+
+    expect(html).toContain('GLM 5.1')
+    expect(html).toContain('128,000')
+    expect(html).not.toContain('deepseek-v4-pro')
+  })
+
   it('renders MCP, Skill, web, attachment, and memory diagnostics', () => {
+    const provider = defaultModelProviderSettings()
     const ctx = {
       ...baseCtx(),
+      form: {
+        claw: { skills: { extraDirs: ['/tmp/project/.agents/skills'] } },
+        provider: {
+          ...provider,
+          providers: [{
+            id: 'zhipu',
+            name: 'Zhipu AI',
+            apiKey: 'sk-zhipu',
+            baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
+            endpointFormat: 'chat_completions',
+            models: ['glm-5.1'],
+            mainModelId: 'glm-5.1',
+            modelDetails: {
+              'glm-5.1': {
+                id: 'glm-5.1',
+                name: 'GLM 5.1'
+              }
+            }
+          }]
+        }
+      },
+      dragon: {
+        ...defaultDragonRuntimeSettings(),
+        providerId: 'zhipu',
+        model: 'glm-5.1'
+      },
       runtimeInfo: {
         pid: 123,
         capabilities: {
-          model: { id: 'deepseek-chat' },
+          model: { id: 'deepseek-v4-pro' },
           mcp: { status: 'available', configuredServers: 2, connectedServers: 2 },
           web: { status: 'available', provider: 'brave-search' },
           skills: { status: 'available' },
@@ -510,9 +578,11 @@ describe('AgentsSettingsSection Dragon diagnostics smoke', () => {
 
     const html = renderToStaticMarkup(createElement(AgentsSettingsSection, { ctx }))
 
-    expect(html).toContain('Dragon diagnostics')
+    expect(html).toContain('Runtime status')
     expect(html).toContain('MCP')
     expect(html).toContain('available')
+    expect(html).toContain('GLM 5.1')
+    expect(html).not.toContain('deepseek-v4-pro')
     expect(html).toContain('2/2')
     expect(html).toContain('brave-search')
     expect(html).toContain('Providers')
@@ -522,6 +592,23 @@ describe('AgentsSettingsSection Dragon diagnostics smoke', () => {
     expect(html).toContain('mem_1')
     expect(html).toContain('Disable memory')
     expect(html).toContain('Delete memory')
+  })
+
+  it('shows the runtime model as not configured when no provider model can be resolved', () => {
+    const ctx = {
+      ...baseCtx(),
+      runtimeInfo: {
+        pid: 123,
+        capabilities: {
+          model: { id: 'deepseek-v4-pro' }
+        }
+      }
+    }
+
+    const html = renderToStaticMarkup(createElement(AgentsSettingsSection, { ctx }))
+
+    expect(html).toContain('Not configured')
+    expect(html).not.toContain('deepseek-v4-pro')
   })
 
   it('describes MCP config as an external-tool JSON file instead of model credentials', () => {

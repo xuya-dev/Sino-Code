@@ -2,23 +2,16 @@
 import type {
   ApprovalPolicy,
   AppSettingsV1,
-  ModelEndpointFormat,
   SandboxMode
 } from '@shared/app-settings'
 import {
-  MODEL_ENDPOINT_FORMATS,
-  DEFAULT_WRITE_INLINE_COMPLETION_BASE_URL,
-  DEFAULT_WRITE_INLINE_COMPLETION_MAX_TOKENS,
-  DEFAULT_WRITE_INLINE_COMPLETION_MODEL,
-  DEFAULT_WRITE_INLINE_LONG_COMPLETION_MAX_TOKENS,
   DEFAULT_DRAGON_DATA_DIR,
   getModelProviderModelDetail,
-  isDragonRuntimeInsecure
+  isDragonRuntimeInsecure,
+  resolveDragonRuntimeSettings
 } from '@shared/app-settings'
-import type { GuiUpdateChannel } from '@shared/gui-update'
 import type { SkillRootId } from '../lib/skill-root-preference'
 import { Ban, ChevronDown, FolderOpen, Loader2, RefreshCw, Settings, Trash2 } from 'lucide-react'
-import { GuiUpdateControl } from './settings-gui-update'
 import { SelectDropdown } from './SelectDropdown'
 import {
   InlineNoticeView,
@@ -63,18 +56,13 @@ const EMPTY_TOKEN_ECONOMY_SAVINGS_STATE: TokenEconomySavingsState = {
   summary: null
 }
 
-const MODEL_ENDPOINT_FORMAT_LABEL_KEYS: Record<ModelEndpointFormat, string> = {
-  chat_completions: 'modelEndpointChatCompletions',
-  responses: 'modelEndpointResponses',
-  messages: 'modelEndpointMessages'
-}
-
 type ModelContextProfileSummary = {
   modelLabel: string
   contextWindowLabel: string
   softThresholdLabel: string
   hardThresholdLabel: string
   sourceLabelKey: string
+  configured: boolean
 }
 
 function formatTokenNumber(value: number): string {
@@ -95,17 +83,24 @@ function modelContextProfileSummary(input: {
       contextWindowLabel: formatTokenNumber(input.maxContext),
       softThresholdLabel: formatTokenNumber(softThreshold),
       hardThresholdLabel: formatTokenNumber(hardThreshold),
-      sourceLabelKey: 'dragonModelContextSourceConfigured'
+      sourceLabelKey: 'dragonModelContextSourceConfigured',
+      configured: true
     }
   }
   const model = input.model?.trim() || 'auto'
   return {
     modelLabel: model,
-    contextWindowLabel: 'models.profiles',
-    softThresholdLabel: formatTokenNumber(input.fallbackSoftThreshold),
-    hardThresholdLabel: formatTokenNumber(input.fallbackHardThreshold),
-    sourceLabelKey: 'dragonModelContextSourceFallback'
+    contextWindowLabel: '—',
+    softThresholdLabel: '—',
+    hardThresholdLabel: '—',
+    sourceLabelKey: 'dragonModelContextSourceFallback',
+    configured: false
   }
+}
+
+function modelDetailDisplayName(modelId: string, detailName: string | undefined): string {
+  const trimmedName = detailName?.trim() ?? ''
+  return trimmedName || modelId
 }
 
 function usageNumber(value: unknown): number {
@@ -161,37 +156,9 @@ export function AgentsSettingsSection({ ctx }: { ctx: Record<string, any> }): Re
     dragon,
     update,
     updateDragon,
-    showApiKey,
-    setShowApiKey,
     showRuntimeToken,
     setShowRuntimeToken,
     portError,
-    openOnboardingPreview,
-    pickWorkspace,
-    resetWorkspaceToDefault,
-    workspacePickerError,
-    guiUpdateInfo,
-    checkingGuiUpdate,
-    downloadingGuiUpdate,
-    installingGuiUpdate,
-    guiUpdateDownloaded,
-    guiUpdateProgress,
-    guiUpdateError,
-    checkGuiUpdate,
-    downloadGuiUpdate,
-    installGuiUpdate,
-    logPath,
-    logDirOpenError,
-    setLogDirOpenError,
-    pickWriteWorkspace,
-    resetWriteWorkspaceToDefault,
-    writeWorkspacePickerError,
-    writeInlineBaseUrlInherited,
-    effectiveWriteInlineBaseUrl,
-    writeInlineModelInherited,
-    effectiveWriteInlineModel,
-    setWriteDebugModalOpen,
-    loadWriteDebugEntries,
     scrollToAgentSection,
     agentsSectionRef,
     skillSectionRef,
@@ -293,11 +260,25 @@ export function AgentsSettingsSection({ ctx }: { ctx: Record<string, any> }): Re
     summaryMaxTokens: 1200,
     summaryInputMaxBytes: 98304
   }
-  const modelDetail = form
-    ? getModelProviderModelDetail(form as AppSettingsV1, dragon.model, dragon.providerId)
+  const formWithDragon = form
+    ? {
+        ...(form as AppSettingsV1),
+        agents: {
+          ...(form as Partial<AppSettingsV1>).agents,
+          dragon
+        }
+      } as AppSettingsV1
     : undefined
+  const resolvedDragon = formWithDragon ? resolveDragonRuntimeSettings(formWithDragon) : dragon
+  const modelDetail = formWithDragon
+    ? getModelProviderModelDetail(formWithDragon, resolvedDragon.model, resolvedDragon.providerId)
+    : undefined
+  const configuredRuntimeModelId = resolvedDragon.model?.trim() ?? ''
+  const configuredRuntimeModelLabel = configuredRuntimeModelId
+    ? modelDetailDisplayName(configuredRuntimeModelId, modelDetail?.name)
+    : t('dragonRuntimeModelUnset')
   const modelContext = modelContextProfileSummary({
-    model: dragon.model,
+    model: configuredRuntimeModelLabel,
     maxContext: modelDetail?.maxContext,
     fallbackSoftThreshold: contextCompaction.defaultSoftThreshold,
     fallbackHardThreshold: contextCompaction.defaultHardThreshold
@@ -392,7 +373,7 @@ export function AgentsSettingsSection({ ctx }: { ctx: Record<string, any> }): Re
               </div>
 
               <div ref={agentsSectionRef}>
-                <SettingsCard title={t('agents')}>
+                <SettingsCard title={t('runtimeSettings')}>
                   <SettingRow
                     title={t('autoStart')}
                     description={t('autoStartDesc')}
@@ -466,17 +447,6 @@ export function AgentsSettingsSection({ ctx }: { ctx: Record<string, any> }): Re
                         placeholder={DEFAULT_DRAGON_DATA_DIR}
                         value={dragon.dataDir}
                         onChange={(e) => updateDragon({ dataDir: e.target.value })}
-                      />
-                    }
-                  />
-                  <SettingRow
-                    title={t('dragonModel')}
-                    description={t('dragonModelDesc')}
-                    control={
-                      <input
-                        className="w-full min-w-0 rounded-xl border border-ds-border bg-ds-card px-3 py-2 text-[14px] text-ds-ink shadow-sm focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-accent/30 md:max-w-md"
-                        value={dragon.model}
-                        onChange={(e) => updateDragon({ model: e.target.value })}
                       />
                     }
                   />
@@ -709,7 +679,7 @@ export function AgentsSettingsSection({ ctx }: { ctx: Record<string, any> }): Re
                         </div>
                         <div className="min-w-0 rounded-xl border border-ds-border-muted bg-ds-card px-3 py-2">
                           <div className="text-[11px] font-medium uppercase text-ds-faint">
-                            {t('dragonModelContextSoft')}
+                            {t(modelContext.configured ? 'dragonModelContextSoft' : 'dragonModelContextFallbackSoft')}
                           </div>
                           <div className="mt-1 truncate text-[13px] font-semibold text-ds-ink">
                             {modelContext.softThresholdLabel}
@@ -717,7 +687,7 @@ export function AgentsSettingsSection({ ctx }: { ctx: Record<string, any> }): Re
                         </div>
                         <div className="min-w-0 rounded-xl border border-ds-border-muted bg-ds-card px-3 py-2">
                           <div className="text-[11px] font-medium uppercase text-ds-faint">
-                            {t('dragonModelContextHard')}
+                            {t(modelContext.configured ? 'dragonModelContextHard' : 'dragonModelContextFallbackHard')}
                           </div>
                           <div className="mt-1 truncate text-[13px] font-semibold text-ds-ink">
                             {modelContext.hardThresholdLabel}
@@ -940,7 +910,7 @@ export function AgentsSettingsSection({ ctx }: { ctx: Record<string, any> }): Re
                         </div>
                         <div className="grid gap-2 text-[12.5px] text-ds-muted sm:grid-cols-2">
                           <div className="rounded-xl border border-ds-border-muted bg-ds-main/40 px-3 py-2">
-                            {t('dragonRuntimeModel')}: <span className="font-mono text-ds-ink">{runtimeInfo?.capabilities?.model?.id ?? 'unknown'}</span>
+                            {t('dragonRuntimeModel')}: <span className="font-medium text-ds-ink">{configuredRuntimeModelLabel}</span>
                           </div>
                           <div className="rounded-xl border border-ds-border-muted bg-ds-main/40 px-3 py-2">
                             {t('dragonRuntimePid')}: <span className="font-mono text-ds-ink">{runtimeInfo?.pid ?? 'unknown'}</span>
