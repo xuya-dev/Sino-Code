@@ -1,13 +1,5 @@
 import { useRef, useState, type ReactElement } from 'react'
 import { createPortal } from 'react-dom'
-import type { FC, SVGProps } from 'react'
-import DeepSeekColor from '@lobehub/icons/es/DeepSeek/components/Color'
-import ZhipuColor from '@lobehub/icons/es/Zhipu/components/Color'
-import MinimaxColor from '@lobehub/icons/es/Minimax/components/Color'
-import MoonshotMono from '@lobehub/icons/es/Moonshot/components/Mono'
-import QwenColor from '@lobehub/icons/es/Qwen/components/Color'
-import TencentColor from '@lobehub/icons/es/Tencent/components/Color'
-import XiaomiMiMoMono from '@lobehub/icons/es/XiaomiMiMo/components/Mono'
 import type {
   AppSettingsPatch,
   AppSettingsV1,
@@ -26,6 +18,7 @@ import type { ProviderModelsResult } from '@shared/sino-code-api'
 import { useTranslation } from 'react-i18next'
 import { PROVIDER_PRESETS, getDefaultEndpoint, findEndpointByUrl, type ProviderPreset } from '@shared/provider-presets'
 import { ChevronDown, Loader2, Plus, RefreshCw, Trash2 } from 'lucide-react'
+import { ProviderBrandIcon } from './ProviderBrandIcon'
 import { SelectDropdown } from './SelectDropdown'
 import {
   SecretInput,
@@ -36,18 +29,6 @@ const MODEL_ENDPOINT_FORMAT_LABEL_KEYS: Record<string, string> = {
   chat_completions: 'modelEndpointChatCompletions',
   responses: 'modelEndpointResponses',
   messages: 'modelEndpointMessages'
-}
-
-type SvgIcon = FC<SVGProps<SVGSVGElement> & { size?: number | string }>
-
-const PROVIDER_ICON_MAP: Record<string, SvgIcon> = {
-  deepseek: DeepSeekColor as unknown as SvgIcon,
-  zhipu: ZhipuColor as unknown as SvgIcon,
-  minimax: MinimaxColor as unknown as SvgIcon,
-  moonshot: MoonshotMono as unknown as SvgIcon,
-  alibaba: QwenColor as unknown as SvgIcon,
-  tencent: TencentColor as unknown as SvgIcon,
-  xiaomi: XiaomiMiMoMono as unknown as SvgIcon
 }
 
 type SettingsPopoverPlacement = {
@@ -62,12 +43,6 @@ type SettingsPopoverAnchorRect = Pick<DOMRect, 'bottom' | 'left'>
 const SETTINGS_POPOVER_MARGIN = 8
 const SETTINGS_POPOVER_GAP = 4
 const SETTINGS_POPOVER_MIN_HEIGHT = 80
-
-function ProviderBrandIcon({ providerId, size = 20 }: { providerId: string; size?: number }) {
-  const IconComp = PROVIDER_ICON_MAP[providerId]
-  if (!IconComp) return null
-  return <IconComp size={size} />
-}
 
 export function calculateSettingsPopoverPlacement({
   anchorRect,

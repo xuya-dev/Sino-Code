@@ -1,13 +1,5 @@
 import { type ReactElement, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import DeepSeekColor from '@lobehub/icons/es/DeepSeek/components/Color'
-import ZhipuColor from '@lobehub/icons/es/Zhipu/components/Color'
-import MinimaxColor from '@lobehub/icons/es/Minimax/components/Color'
-import MoonshotMono from '@lobehub/icons/es/Moonshot/components/Mono'
-import QwenColor from '@lobehub/icons/es/Qwen/components/Color'
-import TencentColor from '@lobehub/icons/es/Tencent/components/Color'
-import XiaomiMiMoMono from '@lobehub/icons/es/XiaomiMiMo/components/Mono'
-import type { FC, SVGProps } from 'react'
 import {
   getActiveAgentApiKey,
   getModelProviderSettings,
@@ -20,25 +12,8 @@ import { rendererRuntimeClient } from '../agent/runtime-client'
 import { applyTheme } from '../lib/apply-theme'
 import { useChatStore } from '../store/chat-store'
 import { Eye, EyeOff, ExternalLink, Sparkles, Sun, Moon, Monitor, X, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ProviderBrandIcon } from './ProviderBrandIcon'
 import { SelectDropdown } from './SelectDropdown'
-
-type SvgIcon = FC<SVGProps<SVGSVGElement> & { size?: number | string }>
-
-const PROVIDER_ICON_MAP: Record<string, SvgIcon> = {
-  deepseek: DeepSeekColor as unknown as SvgIcon,
-  zhipu: ZhipuColor as unknown as SvgIcon,
-  minimax: MinimaxColor as unknown as SvgIcon,
-  moonshot: MoonshotMono as unknown as SvgIcon,
-  alibaba: QwenColor as unknown as SvgIcon,
-  tencent: TencentColor as unknown as SvgIcon,
-  xiaomi: XiaomiMiMoMono as unknown as SvgIcon
-}
-
-function ProviderBrandIcon({ providerId, size = 24 }: { providerId: string; size?: number }) {
-  const IconComp = PROVIDER_ICON_MAP[providerId]
-  if (!IconComp) return null
-  return <IconComp size={size} />
-}
 
 type ThemePref = AppSettingsV1['theme']
 type SetupFormPatch = AppSettingsPatch

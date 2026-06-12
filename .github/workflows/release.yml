@@ -61,6 +61,8 @@ jobs:
       CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
       APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
       APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+      MAC_CODESIGN_P12_BASE64: ${{ secrets.MAC_CODESIGN_P12_BASE64 }}
+      APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 }}
       CSC_FOR_PULL_REQUEST: 'true'
     steps:
       - name: Check out source
@@ -77,19 +79,30 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Decode Apple signing credentials
-        env:
-          MAC_CODESIGN_P12_BASE64: ${{ secrets.MAC_CODESIGN_P12_BASE64 }}
-          APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 }}
+      - name: Detect Apple signing credentials
+        id: apple-signing
         run: |
           set -euo pipefail
 
+          missing=()
           for name in MAC_CODESIGN_P12_BASE64 CSC_KEY_PASSWORD APPLE_API_KEY_BASE64 APPLE_API_KEY_ID APPLE_API_ISSUER; do
             if [[ -z "${!name:-}" ]]; then
-              echo "::error::Missing required secret or environment value: ${name}"
-              exit 1
+              missing+=("${name}")
             fi
           done
+
+          if [[ "${#missing[@]}" -eq 0 ]]; then
+            echo "enabled=true" >> "${GITHUB_OUTPUT}"
+            echo "Apple signing credentials are configured."
+          else
+            echo "enabled=false" >> "${GITHUB_OUTPUT}"
+            printf 'Apple signing credentials are not fully configured; building unsigned macOS packages. Missing: %s\n' "${missing[*]}"
+          fi
+
+      - name: Decode Apple signing credentials
+        if: steps.apple-signing.outputs.enabled == 'true'
+        run: |
+          set -euo pipefail
 
           cert_path="${RUNNER_TEMP}/developer-id.p12"
           key_path="${RUNNER_TEMP}/AuthKey_${APPLE_API_KEY_ID}.p8"
@@ -109,6 +122,7 @@ jobs:
           } >> "${GITHUB_ENV}"
 
       - name: Verify Apple signing credentials
+        if: steps.apple-signing.outputs.enabled == 'true'
         run: >
           npm run verify:apple -- --p12 "${CSC_LINK}"
           --p12-password "${CSC_KEY_PASSWORD}"
@@ -118,7 +132,12 @@ jobs:
           --check-notary
 
       - name: Build signed macOS packages
+        if: steps.apple-signing.outputs.enabled == 'true'
         run: npm run dist:mac:signed
+
+      - name: Build unsigned macOS packages
+        if: steps.apple-signing.outputs.enabled != 'true'
+        run: npm run dist:mac
 
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4
@@ -289,7 +308,7 @@ jobs:
             echo "- Release channel: \`${RELEASE_CHANNEL}\`"
             echo "- Ref: \`${GITHUB_REF_NAME}\`"
             echo "- Commit: \`${GITHUB_SHA::7}\`"
-            echo "- macOS: Developer ID signed and notarized"
+            echo "- macOS: built unsigned when Apple signing secrets are absent"
             echo "- Platforms: macOS arm64/x64, Windows x64, Linux x64"
           } >> release-notes.md
 
