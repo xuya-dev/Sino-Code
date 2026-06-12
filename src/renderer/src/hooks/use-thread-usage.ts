@@ -43,11 +43,6 @@ export function formatCompactNumber(value: number): string {
   return new Intl.NumberFormat().format(value)
 }
 
-function isChineseLocale(locale?: string): boolean {
-  const normalized = (locale ?? '').trim().toLowerCase()
-  return normalized === 'zh' || normalized.startsWith('zh-')
-}
-
 function fallbackLocale(): string {
   return typeof navigator !== 'undefined' ? navigator.language : 'en'
 }
@@ -57,12 +52,7 @@ function formatMoneyValue(value: number): string {
   return safeValue.toFixed(safeValue >= 1 ? 2 : 4)
 }
 
-export function formatCost(costUsd: number, locale = fallbackLocale(), costCny?: number | null): string {
-  if (isChineseLocale(locale)) {
-    const safeUsd = Number.isFinite(costUsd) ? costUsd : 0
-    const value = typeof costCny === 'number' && Number.isFinite(costCny) ? costCny : safeUsd * 7.2
-    return `￥${formatMoneyValue(value)}`
-  }
+export function formatCost(costUsd: number, _locale = fallbackLocale(), _costCny?: number | null): string {
   return `$${formatMoneyValue(costUsd)}`
 }
 

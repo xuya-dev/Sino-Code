@@ -16,12 +16,31 @@ export class MiniMaxClient extends BaseOpenAiClient {
     body: Record<string, unknown>,
     request: ModelRequest
   ): void {
-    if (Object.prototype.hasOwnProperty.call(body, 'thinking')) return
     const model = request.model?.trim() || this.config.model
-    if (this.modelSupportsThinking(model)) {
-      body.thinking = { type: 'adaptive' }
-      body.reasoning_split = true
+    if (!this.modelSupportsThinking(model)) {
+      delete body.thinking
+      delete body.reasoning_effort
+      return
     }
+
+    const effort = request.reasoningEffort?.trim().toLowerCase()
+    const disabled = effort === 'off' || effort === 'disabled' || effort === 'none' || effort === 'false'
+    delete body.reasoning_effort
+
+    if (isMiniMaxM3Model(model)) {
+      body.thinking = { type: disabled ? 'disabled' : 'adaptive' }
+      if (!disabled) body.reasoning_split = true
+      return
+    }
+
+    if (disabled) {
+      delete body.thinking
+      body.reasoning_split = true
+      return
+    }
+
+    body.thinking = { type: 'adaptive' }
+    body.reasoning_split = true
   }
 
   protected override async classifyHttpError(
@@ -57,4 +76,8 @@ export class MiniMaxClient extends BaseOpenAiClient {
     return /\b(stream_options|include_usage)\b/i.test(text)
   }
 
+}
+
+function isMiniMaxM3Model(model: string): boolean {
+  return /(?:^|[^a-z0-9])(?:minimax[-_ ]*)?m3(?:$|[^a-z0-9])/i.test(model)
 }

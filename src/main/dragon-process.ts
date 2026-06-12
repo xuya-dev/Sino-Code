@@ -207,7 +207,7 @@ export async function startDragonChild(settings: AppSettingsV1): Promise<void> {
   const resolution = resolveDragonExecutable(root, runtime.binaryPath)
   if (resolution.command === process.execPath && !existsSync(resolution.args[0])) {
     throw new Error(
-      `Dragon runtime build is missing at ${resolution.args[0]}. Run \`npm run build:dragon\` before starting the GUI.`
+      `Dragon runtime build is missing at ${resolution.args[0]}. Run \`npm run build:dragon\` before starting the app.`
     )
   }
   const dataDir = resolveDragonDataDir(runtime)
@@ -575,6 +575,7 @@ function modelConfigForRuntime(
         priceOutput: detail.priceOutput,
         priceInputCacheRead: detail.priceInputCacheRead,
         priceInputCacheWrite: detail.priceInputCacheWrite,
+        priceTiers: detail.priceTiers,
         supportsThinking: detail.supportsThinking,
         thinkingLevel: detail.thinkingLevel
       }

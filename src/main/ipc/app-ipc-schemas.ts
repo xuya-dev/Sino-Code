@@ -173,6 +173,13 @@ const modelDetailSchema = z.object({
   priceOutput: z.string().trim().max(128).optional(),
   priceInputCacheRead: z.string().trim().max(128).optional(),
   priceInputCacheWrite: z.string().trim().max(128).optional(),
+  priceTiers: z.array(z.object({
+    minInputTokens: z.number().int().positive().max(10_000_000).optional(),
+    priceInput: z.string().trim().max(128).optional(),
+    priceOutput: z.string().trim().max(128).optional(),
+    priceInputCacheRead: z.string().trim().max(128).optional(),
+    priceInputCacheWrite: z.string().trim().max(128).optional()
+  }).strict()).max(16).optional(),
   maxContext: z.number().int().positive().max(10_000_000).optional(),
   maxOutput: z.number().int().positive().max(10_000_000).optional(),
   supportsThinking: z.boolean().optional(),

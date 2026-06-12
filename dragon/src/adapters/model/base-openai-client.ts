@@ -9,7 +9,10 @@ import {
   normalizeModelEndpointFormat,
   type ModelEndpointFormat
 } from '../../contracts/model-endpoint-format.js'
-import type { ModelConfig } from '../../loop/model-context-profile.js'
+import type {
+  ModelConfig,
+  ModelContextProfileConfig
+} from '../../loop/model-context-profile.js'
 
 /**
  * Configuration for the compatible HTTP model client. Chat
@@ -144,6 +147,60 @@ const THINKING_ENABLED_EFFORTS = new Set([
   'xhigh'
 ])
 
+type PricingFields = Pick<
+  ModelContextProfileConfig,
+  'priceInput' | 'priceOutput' | 'priceInputCacheRead' | 'priceInputCacheWrite'
+>
+
+type ParsedPricing = {
+  priceInput: number
+  priceOutput: number
+  priceInputCacheHit: number
+  priceInputCacheMiss: number
+}
+
+function selectPricingFields(
+  profile: ModelContextProfileConfig,
+  inputTokens: number
+): PricingFields | null {
+  const tiers = Array.isArray(profile.priceTiers) ? profile.priceTiers : []
+  if (tiers.length === 0) return profile
+
+  const matchedTier = tiers
+    .filter((tier) => typeof tier.minInputTokens === 'number' && tier.minInputTokens > 0)
+    .sort((a, b) => (b.minInputTokens ?? 0) - (a.minInputTokens ?? 0))
+    .find((tier) => inputTokens >= (tier.minInputTokens ?? 0))
+  if (!matchedTier) return profile
+  return {
+    priceInput: matchedTier.priceInput || profile.priceInput,
+    priceOutput: matchedTier.priceOutput || profile.priceOutput,
+    priceInputCacheRead: matchedTier.priceInputCacheRead || profile.priceInputCacheRead,
+    priceInputCacheWrite: matchedTier.priceInputCacheWrite || profile.priceInputCacheWrite
+  }
+}
+
+function resolveModelPricing(
+  profile: ModelContextProfileConfig,
+  inputTokens: number
+): ParsedPricing | null {
+  const fields = selectPricingFields(profile, inputTokens)
+  if (!fields?.priceInput || !fields.priceOutput) return null
+
+  const inputPriceVal = parseFloat(fields.priceInput)
+  const outputPriceVal = parseFloat(fields.priceOutput)
+  if (isNaN(inputPriceVal) || isNaN(outputPriceVal)) return null
+
+  const cacheReadPriceVal = fields.priceInputCacheRead ? parseFloat(fields.priceInputCacheRead) : NaN
+  const cacheWritePriceVal = fields.priceInputCacheWrite ? parseFloat(fields.priceInputCacheWrite) : NaN
+
+  return {
+    priceInput: inputPriceVal,
+    priceOutput: outputPriceVal,
+    priceInputCacheHit: !isNaN(cacheReadPriceVal) ? cacheReadPriceVal : inputPriceVal * 0.1,
+    priceInputCacheMiss: !isNaN(cacheWritePriceVal) ? cacheWritePriceVal : inputPriceVal
+  }
+}
+
 /**
  * Base OpenAI-compatible model client.
  *
@@ -187,7 +244,7 @@ export abstract class BaseOpenAiClient implements ModelClient {
     return false
   }
 
-  protected getModelProfile(model: string | undefined): any {
+  protected getModelProfile(model: string | undefined): ModelContextProfileConfig | null {
     const normalized = model?.trim()
     if (!normalized) return null
     if (!this.config.models?.profiles) return null
@@ -220,31 +277,21 @@ export abstract class BaseOpenAiClient implements ModelClient {
     fallbackModel: string | undefined,
     cacheHitTokens: number,
     cacheMissTokens: number,
-    outputTokens: number
+    outputTokens: number,
+    inputTokens: number
   ): { costUsd: number; costCny: number } | null {
     const profile =
       this.getModelProfile(model ?? this.config.model) ??
       this.getModelProfile(fallbackModel)
     if (!profile) return null
-    const priceInput = profile.priceInput
-    const priceOutput = profile.priceOutput
-    if (!priceInput || !priceOutput) return null
-
-    const inputPriceVal = parseFloat(priceInput)
-    const outputPriceVal = parseFloat(priceOutput)
-    if (isNaN(inputPriceVal) || isNaN(outputPriceVal)) return null
-
-    const cacheReadPriceVal = profile.priceInputCacheRead ? parseFloat(profile.priceInputCacheRead) : NaN
-    const cacheWritePriceVal = profile.priceInputCacheWrite ? parseFloat(profile.priceInputCacheWrite) : NaN
-
-    const priceInputCacheHit = !isNaN(cacheReadPriceVal) ? cacheReadPriceVal : inputPriceVal * 0.1
-    const priceInputCacheMiss = !isNaN(cacheWritePriceVal) ? cacheWritePriceVal : inputPriceVal
+    const pricing = resolveModelPricing(profile, Math.max(inputTokens, cacheHitTokens + cacheMissTokens))
+    if (!pricing) return null
 
     const TOKENS_PER_MILLION = 1_000_000
     const costUsd =
-      (cacheHitTokens / TOKENS_PER_MILLION) * priceInputCacheHit +
-      (cacheMissTokens / TOKENS_PER_MILLION) * priceInputCacheMiss +
-      (outputTokens / TOKENS_PER_MILLION) * outputPriceVal
+      (cacheHitTokens / TOKENS_PER_MILLION) * pricing.priceInputCacheHit +
+      (cacheMissTokens / TOKENS_PER_MILLION) * pricing.priceInputCacheMiss +
+      (outputTokens / TOKENS_PER_MILLION) * pricing.priceOutput
     return {
       costUsd,
       costCny: costUsd * 7.2
@@ -255,25 +302,18 @@ export abstract class BaseOpenAiClient implements ModelClient {
   protected estimateCacheSavings(
     model: string | undefined,
     fallbackModel: string | undefined,
-    cacheHitTokens: number
+    cacheHitTokens: number,
+    inputTokens: number
   ): { costUsd: number; costCny: number } | null {
     const profile =
       this.getModelProfile(model ?? this.config.model) ??
       this.getModelProfile(fallbackModel)
     if (!profile) return null
-    const priceInput = profile.priceInput
-    if (!priceInput) return null
-    const inputPriceVal = parseFloat(priceInput)
-    if (isNaN(inputPriceVal)) return null
-
-    const cacheReadPriceVal = profile.priceInputCacheRead ? parseFloat(profile.priceInputCacheRead) : NaN
-    const cacheWritePriceVal = profile.priceInputCacheWrite ? parseFloat(profile.priceInputCacheWrite) : NaN
-
-    const priceInputCacheHit = !isNaN(cacheReadPriceVal) ? cacheReadPriceVal : inputPriceVal * 0.1
-    const priceInputCacheMiss = !isNaN(cacheWritePriceVal) ? cacheWritePriceVal : inputPriceVal
+    const pricing = resolveModelPricing(profile, Math.max(inputTokens, cacheHitTokens))
+    if (!pricing) return null
 
     const TOKENS_PER_MILLION = 1_000_000
-    const costUsd = (cacheHitTokens / TOKENS_PER_MILLION) * Math.max(0, priceInputCacheMiss - priceInputCacheHit)
+    const costUsd = (cacheHitTokens / TOKENS_PER_MILLION) * Math.max(0, pricing.priceInputCacheMiss - pricing.priceInputCacheHit)
     return {
       costUsd,
       costCny: costUsd * 7.2
@@ -284,7 +324,8 @@ export abstract class BaseOpenAiClient implements ModelClient {
   estimateInputCost(model: string, inputTokens: number): { costUsd: number; costCny: number } | null {
     const profile = this.getModelProfile(model)
     if (!profile) return null
-    const priceInput = profile.priceInput || profile.priceInputCacheWrite
+    const pricingFields = selectPricingFields(profile, inputTokens)
+    const priceInput = pricingFields?.priceInput || pricingFields?.priceInputCacheWrite
     if (!priceInput) return null
     const inputPriceVal = parseFloat(priceInput)
     if (isNaN(inputPriceVal)) return null
@@ -1360,8 +1401,9 @@ export abstract class BaseOpenAiClient implements ModelClient {
     const { cacheHit, cacheMiss } = this.mapUsageCacheFields(usage)
     const cacheTotal = cacheHit + cacheMiss
     const cacheHitRate = cacheTotal === 0 ? null : cacheHit / cacheTotal
-    const estimatedCost = this.estimateCost(model, fallbackModel, cacheHit, cacheMiss, completionTokens)
-    const estimatedSavings = this.estimateCacheSavings(model, fallbackModel, cacheHit)
+    const inputTokensForPricing = promptTokens || cacheTotal
+    const estimatedCost = this.estimateCost(model, fallbackModel, cacheHit, cacheMiss, completionTokens, inputTokensForPricing)
+    const estimatedSavings = this.estimateCacheSavings(model, fallbackModel, cacheHit, inputTokensForPricing)
     const reportedCostUsd = Number(usage.cost_usd ?? usage.costUsd)
     const reportedCostCny = Number(usage.cost_cny ?? usage.costCny)
     return {

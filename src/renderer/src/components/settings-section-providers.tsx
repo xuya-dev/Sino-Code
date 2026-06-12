@@ -13,6 +13,7 @@ import type {
   AppSettingsV1,
   ModelEndpointFormat,
   ModelDetailV1,
+  ModelPriceTierV1,
   ModelProviderProfileV1,
   ModelProviderSettingsV1
 } from '@shared/app-settings'
@@ -332,9 +333,11 @@ function ProviderConfigPanel({
   const [fetchModelsNotice, setFetchModelsNotice] = useState<string | null>(null)
   const [endpointMode, setEndpointMode] = useState<'preset' | 'custom'>('preset')
   const [activeThinkingPopModelId, setActiveThinkingPopModelId] = useState<string | null>(null)
+  const [activePricingPopModelId, setActivePricingPopModelId] = useState<string | null>(null)
   const [popoverAnchorRect, setPopoverAnchorRect] = useState<DOMRect | null>(null)
   const [showAddProviderMenu, setShowAddProviderMenu] = useState(false)
   const [addProviderAnchorRect, setAddProviderAnchorRect] = useState<DOMRect | null>(null)
+  const [modelIdDrafts, setModelIdDrafts] = useState<Record<string, string>>({})
   const modelRowKeysRef = useRef<Map<string, string>>(new Map())
   const modelRowKeySequenceRef = useRef(0)
   const providerOptions = modelProviders.map((item) => {
@@ -482,10 +485,27 @@ function ProviderConfigPanel({
     }
   }
 
-  const handleModelIdChange = (oldId: string, newId: string) => {
-    const trimmedNewId = newId.trim()
+  const clearModelIdDraft = (modelId: string): void => {
+    setModelIdDrafts((current) => {
+      if (!Object.prototype.hasOwnProperty.call(current, modelId)) return current
+      const next = { ...current }
+      delete next[modelId]
+      return next
+    })
+  }
+
+  const handleModelIdDraftChange = (modelId: string, value: string): void => {
+    setModelIdDrafts((current) => ({
+      ...current,
+      [modelId]: value
+    }))
+  }
+
+  const commitModelIdChange = (oldId: string, value: string) => {
+    clearModelIdDraft(oldId)
+    const trimmedNewId = value.trim()
     if (!trimmedNewId || trimmedNewId === oldId) return
-    if (activeProvider.models.includes(trimmedNewId)) return
+    if (activeProvider.models.some((modelId) => modelId !== oldId && modelId === trimmedNewId)) return
 
     const existingRowKey = modelRowKeysRef.current.get(modelRowStorageKey(oldId))
     if (existingRowKey) {
@@ -520,6 +540,39 @@ function ProviderConfigPanel({
     })
   }
 
+  const handlePriceTierChange = (
+    modelId: string,
+    index: number,
+    patch: Partial<ModelPriceTierV1>
+  ): void => {
+    const detail = (activeProvider.modelDetails && activeProvider.modelDetails[modelId]) || { id: modelId }
+    const nextTiers = [...(detail.priceTiers ?? [])]
+    nextTiers[index] = { ...(nextTiers[index] ?? {}), ...patch }
+    handleDetailChange(modelId, { priceTiers: nextTiers })
+  }
+
+  const handleAddPriceTier = (modelId: string): void => {
+    const detail = (activeProvider.modelDetails && activeProvider.modelDetails[modelId]) || { id: modelId }
+    const nextTier: ModelPriceTierV1 = detail.priceTiers?.length
+      ? {
+          priceInput: '',
+          priceOutput: ''
+        }
+      : {
+          priceInput: '',
+          priceOutput: '',
+          priceInputCacheRead: '',
+          priceInputCacheWrite: ''
+        }
+    handleDetailChange(modelId, { priceTiers: [...(detail.priceTiers ?? []), nextTier] })
+  }
+
+  const handleRemovePriceTier = (modelId: string, index: number): void => {
+    const detail = (activeProvider.modelDetails && activeProvider.modelDetails[modelId]) || { id: modelId }
+    const nextTiers = (detail.priceTiers ?? []).filter((_, i) => i !== index)
+    handleDetailChange(modelId, { priceTiers: nextTiers.length > 0 ? nextTiers : undefined })
+  }
+
   const handleAddModel = () => {
     let index = 1
     let newModelId = `new-model-${index}`
@@ -549,6 +602,7 @@ function ProviderConfigPanel({
     const nextDetails = { ...(activeProvider.modelDetails || {}) }
     delete nextDetails[modelId]
     modelRowKeysRef.current.delete(modelRowStorageKey(modelId))
+    clearModelIdDraft(modelId)
     updateModelProvider(activeProvider.id, {
       models: nextModels,
       ...(activeProvider.mainModelId === modelId ? { mainModelId: undefined } : {}),
@@ -874,7 +928,7 @@ function ProviderConfigPanel({
           </div>
 
           <div className="max-h-[400px] min-w-0 overflow-auto rounded-xl border border-ds-border/70 bg-ds-card/25 shadow-sm">
-            <table className="w-full table-fixed border-collapse text-left text-[12.5px]" style={{ minWidth: 1200 }}>
+            <table className="w-full table-fixed border-collapse text-left text-[12.5px]" style={{ minWidth: 1320 }}>
               <thead>
                 <tr className="border-b border-ds-border bg-ds-main/30 text-[11px] font-semibold text-ds-muted uppercase tracking-wider sticky top-0 z-10 backdrop-blur-md">
                   <th className="px-3 py-2 w-[180px]">{t('modelTableId')}</th>
@@ -883,6 +937,7 @@ function ProviderConfigPanel({
                   <th className="px-2 py-2 text-right w-[100px]">{t('modelTablePriceOutput')}</th>
                   <th className="px-2 py-2 text-right w-[120px]">{t('modelTablePriceInputCacheRead')}</th>
                   <th className="px-2 py-2 text-right w-[120px]">{t('modelTablePriceInputCacheWrite')}</th>
+                  <th className="px-2 py-2 text-center w-[90px]">{t('modelTablePriceTiers')}</th>
                   <th className="px-2 py-2 text-right w-[95px]">{t('modelTableMaxContext')}</th>
                   <th className="px-2 py-2 text-right w-[85px]">{t('modelTableMaxOutput')}</th>
                   <th className="px-2 py-2 text-center w-[75px]">{t('modelTableSupportsThinking')}</th>
@@ -893,7 +948,7 @@ function ProviderConfigPanel({
               <tbody className="divide-y divide-ds-border-muted/50">
                 {activeProvider.models.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="px-3 py-6 text-center text-ds-faint">
+                    <td colSpan={12} className="px-3 py-6 text-center text-ds-faint">
                       No models configured. Click "Add Model" or "Fetch model list".
                     </td>
                   </tr>
@@ -905,8 +960,16 @@ function ProviderConfigPanel({
                         <td className="px-3 py-1 font-mono w-[180px]">
                           <input
                             className="w-full bg-transparent border-b border-transparent hover:border-ds-border/40 focus:border-accent/40 focus:outline-none px-1 py-0.5 text-ds-ink"
-                            value={modelId}
-                            onChange={(e) => handleModelIdChange(modelId, e.target.value)}
+                            value={modelIdDrafts[modelId] ?? modelId}
+                            onChange={(e) => handleModelIdDraftChange(modelId, e.target.value)}
+                            onBlur={(e) => commitModelIdChange(modelId, e.currentTarget.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.currentTarget.blur()
+                              } else if (e.key === 'Escape') {
+                                clearModelIdDraft(modelId)
+                              }
+                            }}
                           />
                         </td>
                         <td className="px-2 py-1">
@@ -949,6 +1012,138 @@ function ProviderConfigPanel({
                             onChange={(e) => handleDetailChange(modelId, { priceInputCacheWrite: e.target.value })}
                           />
                         </td>
+                        <td className="px-2 py-1 text-center relative">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              const rect = e.currentTarget.getBoundingClientRect()
+                              setPopoverAnchorRect(rect)
+                              setActiveThinkingPopModelId(null)
+                              setActivePricingPopModelId(activePricingPopModelId === modelId ? null : modelId)
+                            }}
+                            className="inline-flex w-full items-center justify-between gap-1.5 rounded-lg border border-ds-border bg-ds-card/50 px-2 py-1 text-[11px] font-medium text-ds-muted shadow-sm transition hover:bg-ds-hover hover:text-ds-ink"
+                          >
+                            <span className="truncate">
+                              {detail.priceTiers?.length ? `${detail.priceTiers.length} ${t('modelPriceTierCount')}` : '-'}
+                            </span>
+                            <ChevronDown className="h-3 w-3 shrink-0 opacity-60" />
+                          </button>
+
+                          {activePricingPopModelId === modelId && popoverAnchorRect && (() => {
+                            const placement = calculateSettingsPopoverPlacement({
+                              anchorRect: popoverAnchorRect,
+                              width: 560,
+                              maxHeight: 360,
+                              viewportHeight: window.innerHeight,
+                              viewportWidth: window.innerWidth,
+                              coordinateScale: currentBodyZoom()
+                            })
+                            const priceTiers = detail.priceTiers ?? []
+
+                            return createPortal(
+                              <>
+                                <div
+                                  className="fixed inset-0 cursor-default"
+                                  style={{ zIndex: 99999 }}
+                                  onClick={() => {
+                                    setActivePricingPopModelId(null)
+                                    setPopoverAnchorRect(null)
+                                  }}
+                                />
+                                <div
+                                  style={{
+                                    position: 'fixed',
+                                    left: `${placement.left}px`,
+                                    top: `${placement.top}px`,
+                                    width: `${placement.width}px`,
+                                    maxHeight: `${placement.maxHeight}px`,
+                                    zIndex: 100000,
+                                  }}
+                                  className="rounded-xl border border-ds-border bg-ds-elevated p-2 text-left shadow-2xl backdrop-blur-sm animate-in fade-in slide-in-from-top-1 duration-100 overflow-y-auto"
+                                >
+                                  <div className="flex items-center justify-between gap-2 border-b border-ds-border/60 px-2 pb-1.5">
+                                    <div className="text-[10px] font-bold text-ds-faint uppercase">
+                                      {t('modelPriceTiersTitle')}
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleAddPriceTier(modelId)}
+                                      className="inline-flex h-6 items-center gap-1 rounded-md border border-ds-border bg-ds-card px-2 text-[11px] font-medium text-ds-muted transition hover:bg-ds-hover hover:text-ds-ink"
+                                    >
+                                      <Plus className="h-3 w-3" />
+                                      {t('modelPriceTierAdd')}
+                                    </button>
+                                  </div>
+                                  <div className="px-2 pt-2 text-[11px] leading-4 text-ds-faint">
+                                    {t('modelPriceTiersHint')}
+                                  </div>
+                                  <div className="grid grid-cols-[96px_72px_72px_82px_82px_28px] gap-1.5 px-1 pt-2 text-[10px] font-semibold uppercase text-ds-faint">
+                                    <span>{t('modelPriceTierMinInput')}</span>
+                                    <span className="text-right">{t('modelTablePriceInput')}</span>
+                                    <span className="text-right">{t('modelTablePriceOutput')}</span>
+                                    <span className="text-right">{t('modelTablePriceInputCacheRead')}</span>
+                                    <span className="text-right">{t('modelTablePriceInputCacheWrite')}</span>
+                                    <span />
+                                  </div>
+                                  <div className="grid gap-1.5 pt-1">
+                                    {priceTiers.length === 0 ? (
+                                      <div className="rounded-lg border border-dashed border-ds-border px-3 py-4 text-center text-[12px] text-ds-faint">
+                                        {t('modelPriceTiersEmpty')}
+                                      </div>
+                                    ) : priceTiers.map((tier, index) => (
+                                      <div
+                                        key={index}
+                                        className="grid grid-cols-[96px_72px_72px_82px_82px_28px] items-center gap-1.5 rounded-lg bg-ds-card/35 px-1 py-1"
+                                      >
+                                        <input
+                                          type="number"
+                                          className="min-w-0 rounded-md border border-ds-border bg-ds-main px-1.5 py-1 text-[11px] text-ds-ink outline-none focus:border-accent/50"
+                                          value={tier.minInputTokens ?? ''}
+                                          placeholder={t('modelPriceTierThreshold')}
+                                          onChange={(e) => handlePriceTierChange(modelId, index, {
+                                            minInputTokens: e.target.value ? parseInt(e.target.value) : undefined
+                                          })}
+                                        />
+                                        <input
+                                          className="min-w-0 rounded-md border border-ds-border bg-ds-main px-1.5 py-1 text-right font-mono text-[11px] text-ds-ink outline-none focus:border-accent/50"
+                                          value={tier.priceInput ?? ''}
+                                          placeholder={detail.priceInput || '0.00'}
+                                          onChange={(e) => handlePriceTierChange(modelId, index, { priceInput: e.target.value })}
+                                        />
+                                        <input
+                                          className="min-w-0 rounded-md border border-ds-border bg-ds-main px-1.5 py-1 text-right font-mono text-[11px] text-ds-ink outline-none focus:border-accent/50"
+                                          value={tier.priceOutput ?? ''}
+                                          placeholder={detail.priceOutput || '0.00'}
+                                          onChange={(e) => handlePriceTierChange(modelId, index, { priceOutput: e.target.value })}
+                                        />
+                                        <input
+                                          className="min-w-0 rounded-md border border-ds-border bg-ds-main px-1.5 py-1 text-right font-mono text-[11px] text-ds-ink outline-none focus:border-accent/50"
+                                          value={tier.priceInputCacheRead ?? ''}
+                                          placeholder={detail.priceInputCacheRead || '0.00'}
+                                          onChange={(e) => handlePriceTierChange(modelId, index, { priceInputCacheRead: e.target.value })}
+                                        />
+                                        <input
+                                          className="min-w-0 rounded-md border border-ds-border bg-ds-main px-1.5 py-1 text-right font-mono text-[11px] text-ds-ink outline-none focus:border-accent/50"
+                                          value={tier.priceInputCacheWrite ?? ''}
+                                          placeholder={detail.priceInputCacheWrite || '0.00'}
+                                          onChange={(e) => handlePriceTierChange(modelId, index, { priceInputCacheWrite: e.target.value })}
+                                        />
+                                        <button
+                                          type="button"
+                                          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-ds-muted transition hover:bg-ds-hover hover:text-red-500"
+                                          onClick={() => handleRemovePriceTier(modelId, index)}
+                                        >
+                                          <Trash2 className="h-3.5 w-3.5" />
+                                        </button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              </>,
+                              document.body
+                            )
+                          })()}
+                        </td>
                         <td className="px-2 py-1">
                           <input
                             type="number"
@@ -990,6 +1185,7 @@ function ProviderConfigPanel({
                             onClick={(e) => {
                               const rect = e.currentTarget.getBoundingClientRect()
                               setPopoverAnchorRect(rect)
+                              setActivePricingPopModelId(null)
                               setActiveThinkingPopModelId(activeThinkingPopModelId === modelId ? null : modelId)
                             }}
                             className="inline-flex items-center justify-between gap-1.5 rounded-lg border border-ds-border bg-ds-card/50 px-2 py-1 text-[11px] font-medium text-ds-muted shadow-sm hover:bg-ds-hover hover:text-ds-ink disabled:opacity-30 disabled:cursor-not-allowed transition w-full"

@@ -3,6 +3,7 @@ import {
   type AppSettingsV1,
   type DragonRuntimeSettingsV1,
   type ModelDetailV1,
+  type ModelPriceTierV1,
   type ModelProviderProfilePatchV1,
   type ModelProviderProfileV1,
   type ModelProviderSettingsPatchV1,
@@ -139,7 +140,7 @@ export function resolveDragonRuntimeSettings(settings: AppSettingsV1): DragonRun
       ? normalizeConfiguredBaseUrl(runtimeBaseUrl)
       : normalizeConfiguredBaseUrl(providerBaseUrl),
     endpointFormat: provider.endpointFormat,
-    model: runtimeModel && runtimeModel.toLowerCase() !== 'auto'
+    model: runtimeModel && runtimeModel.toLowerCase() !== 'auto' && provider.models.includes(runtimeModel)
       ? runtimeModel
       : providerDefaultRouteModel(provider)
   }
@@ -176,6 +177,7 @@ function normalizeModelDetails(input: unknown): Record<string, ModelDetailV1> | 
       priceOutput: typeof detail.priceOutput === 'string' ? detail.priceOutput.trim() : undefined,
       priceInputCacheRead: typeof detail.priceInputCacheRead === 'string' ? detail.priceInputCacheRead.trim() : undefined,
       priceInputCacheWrite: typeof detail.priceInputCacheWrite === 'string' ? detail.priceInputCacheWrite.trim() : undefined,
+      priceTiers: normalizeModelPriceTiers(detail.priceTiers),
       maxContext: typeof detail.maxContext === 'number' && !isNaN(detail.maxContext) ? detail.maxContext : undefined,
       maxOutput: typeof detail.maxOutput === 'number' && !isNaN(detail.maxOutput) ? detail.maxOutput : undefined,
       supportsThinking: typeof detail.supportsThinking === 'boolean' ? detail.supportsThinking : undefined,
@@ -183,6 +185,36 @@ function normalizeModelDetails(input: unknown): Record<string, ModelDetailV1> | 
     }
   }
   return result
+}
+
+function normalizeModelPriceTiers(input: unknown): ModelPriceTierV1[] | undefined {
+  if (!Array.isArray(input)) return undefined
+  const tiers: ModelPriceTierV1[] = []
+  for (const item of input) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) continue
+    const tier = item as Record<string, unknown>
+    const rawMinInputTokens =
+      typeof tier.minInputTokens === 'number' ? tier.minInputTokens : tier.maxInputTokens
+    const next: ModelPriceTierV1 = {
+      minInputTokens: typeof rawMinInputTokens === 'number' && Number.isFinite(rawMinInputTokens) && rawMinInputTokens > 0
+        ? Math.floor(rawMinInputTokens)
+        : undefined,
+      priceInput: typeof tier.priceInput === 'string' ? tier.priceInput.trim() : undefined,
+      priceOutput: typeof tier.priceOutput === 'string' ? tier.priceOutput.trim() : undefined,
+      priceInputCacheRead: typeof tier.priceInputCacheRead === 'string' ? tier.priceInputCacheRead.trim() : undefined,
+      priceInputCacheWrite: typeof tier.priceInputCacheWrite === 'string' ? tier.priceInputCacheWrite.trim() : undefined
+    }
+    const hasConfiguredField = Boolean(
+      Object.prototype.hasOwnProperty.call(tier, 'minInputTokens') ||
+      Object.prototype.hasOwnProperty.call(tier, 'maxInputTokens') ||
+      Object.prototype.hasOwnProperty.call(tier, 'priceInput') ||
+      Object.prototype.hasOwnProperty.call(tier, 'priceOutput') ||
+      Object.prototype.hasOwnProperty.call(tier, 'priceInputCacheRead') ||
+      Object.prototype.hasOwnProperty.call(tier, 'priceInputCacheWrite')
+    )
+    if (hasConfiguredField) tiers.push(next)
+  }
+  return tiers.length > 0 ? tiers : undefined
 }
 
 function normalizeModelProviderProfile(
@@ -220,7 +252,7 @@ function normalizeProviderModels(models: unknown): string[] {
     const trimmed = model.trim()
     if (trimmed) ids.add(trimmed)
   }
-  return [...ids].sort((a, b) => a.localeCompare(b))
+  return [...ids]
 }
 
 function normalizeProviderModelsForProfile(

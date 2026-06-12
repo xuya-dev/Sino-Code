@@ -296,6 +296,65 @@ describe('syncGuiManagedDragonConfig', () => {
     })
   })
 
+  it('syncs tiered pricing from configured model details', async () => {
+    if (!tempRoot) throw new Error('temp root not initialized')
+    const configPath = join(tempRoot, 'config.json')
+    const module = await import('./dragon-process')
+    const settings = createSettings('/tmp/fake-dragon-child.js')
+    settings.provider.providers = [{
+      id: 'minimax',
+      name: 'MiniMax',
+      apiKey: 'sk-test',
+      baseUrl: 'https://api.minimaxi.com/v1',
+      endpointFormat: 'chat_completions',
+      models: ['MiniMax-M3'],
+      modelDetails: {
+        'MiniMax-M3': {
+          id: 'MiniMax-M3',
+          maxContext: 1000000,
+          maxOutput: 8192,
+          priceInput: '0.3',
+          priceOutput: '1.2',
+          priceInputCacheRead: '0.06',
+          priceInputCacheWrite: '0.375',
+          supportsThinking: true,
+          thinkingLevel: [],
+          priceTiers: [
+            {
+              minInputTokens: 512001,
+              priceInput: '0.6',
+              priceOutput: '2.4',
+              priceInputCacheRead: '0.12',
+              priceInputCacheWrite: '0.375'
+            }
+          ]
+        }
+      }
+    }]
+    settings.agents.dragon.providerId = 'minimax'
+
+    await module.syncGuiManagedDragonConfig(tempRoot, defaultDragonRuntimeSettings(), {
+      settings
+    })
+
+    const parsed = JSON.parse(readFileSync(configPath, 'utf8')) as any
+    expect(parsed.models.profiles['MiniMax-M3']).toMatchObject({
+      contextWindowTokens: 1000000,
+      priceInput: '0.3',
+      priceOutput: '1.2',
+      priceTiers: [
+        {
+          minInputTokens: 512001,
+          priceInput: '0.6',
+          priceOutput: '2.4',
+          priceInputCacheRead: '0.12',
+          priceInputCacheWrite: '0.375'
+        }
+      ]
+    })
+    expect(DragonConfigSchema.safeParse(parsed).success).toBe(true)
+  })
+
   it('removes stale DeepSeek chat aliases from GUI-managed model profiles', async () => {
     if (!tempRoot) throw new Error('temp root not initialized')
     const configPath = join(tempRoot, 'config.json')

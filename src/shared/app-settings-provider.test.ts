@@ -118,17 +118,33 @@ describe('model provider settings', () => {
     expect(resolveDragonRuntimeSettings(state).model).toBe('fast-model')
   })
 
-  it('keeps an explicit Dragon runtime model before provider route fallback', () => {
+  it('keeps an explicit Dragon runtime model only when it belongs to the selected provider', () => {
     const state = settings()
-    state.agents.dragon.model = 'explicit-model'
     state.provider.providers[0] = {
       ...state.provider.providers[0],
-      models: ['fast-model', 'main-model'],
+      models: ['fast-model', 'main-model', 'explicit-model'],
       mainModelId: 'main-model',
       fastModelId: 'fast-model'
     }
 
+    state.agents.dragon.model = 'explicit-model'
     expect(resolveDragonRuntimeSettings(state).model).toBe('explicit-model')
+
+    state.agents.dragon.model = 'stale-other-provider-model'
+    expect(resolveDragonRuntimeSettings(state).model).toBe('main-model')
+  })
+
+  it('ignores stale DeepSeek runtime model overrides after switching providers', () => {
+    const state = settings()
+    state.provider.providers[0] = {
+      ...state.provider.providers[0],
+      models: ['glm-5.1', 'glm-5-flash'],
+      mainModelId: 'glm-5.1',
+      fastModelId: 'glm-5-flash'
+    }
+    state.agents.dragon.model = 'deepseek-v4-pro'
+
+    expect(resolveDragonRuntimeSettings(state).model).toBe('glm-5.1')
   })
 
   it('keeps auto routing models only when they belong to the provider model list', () => {
@@ -191,6 +207,66 @@ describe('model provider settings', () => {
     expect(provider?.modelDetails?.['glm-5.1']?.name).toBe(' GLM 5.1 ')
   })
 
+  it('preserves configured tiered model pricing', () => {
+    const provider = normalizeModelProviderSettings({
+      providers: [
+        {
+          id: 'minimax',
+          name: 'MiniMax',
+          apiKey: 'sk-minimax',
+          baseUrl: 'https://api.minimaxi.com/v1',
+          endpointFormat: 'chat_completions',
+          models: ['MiniMax-M3'],
+          modelDetails: {
+            'MiniMax-M3': {
+              id: 'MiniMax-M3',
+              priceInput: ' 0.3 ',
+              priceOutput: ' 1.2 ',
+              priceInputCacheRead: ' 0.06 ',
+              priceInputCacheWrite: ' 0.375 ',
+              priceTiers: [
+                {
+                  minInputTokens: 512001,
+                  priceInput: '0.6',
+                  priceOutput: '2.4',
+                  priceInputCacheRead: '0.12',
+                  priceInputCacheWrite: '0.375'
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }).providers[0]
+
+    expect(provider?.modelDetails?.['MiniMax-M3']?.priceTiers).toEqual([
+      {
+        minInputTokens: 512001,
+        priceInput: '0.6',
+        priceOutput: '2.4',
+        priceInputCacheRead: '0.12',
+        priceInputCacheWrite: '0.375'
+      }
+    ])
+  })
+
+  it('preserves configured model order while normalizing providers', () => {
+    const provider = normalizeModelProviderSettings({
+      providers: [
+        {
+          id: 'custom',
+          name: 'Custom',
+          apiKey: 'sk-custom',
+          baseUrl: 'https://custom.example/v1',
+          endpointFormat: 'chat_completions',
+          models: ['glm-5', 'glm-5.1', 'fast-model', 'glm-5']
+        }
+      ]
+    }).providers[0]
+
+    expect(provider?.models).toEqual(['glm-5', 'glm-5.1', 'fast-model'])
+  })
+
   it('removes legacy implicit DeepSeek models unless model details explicitly configure them', () => {
     const normalized = normalizeModelProviderSettings({
       providers: [
@@ -214,7 +290,7 @@ describe('model provider settings', () => {
       ]
     }).providers[0]
 
-    expect(normalized?.models).toEqual(['custom-deepseek-model', 'deepseek-v4-pro'])
+    expect(normalized?.models).toEqual(['deepseek-v4-pro', 'custom-deepseek-model'])
   })
 
   it('preserves auto routing models through provider settings merge', () => {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { DeepSeekClient } from '../src/adapters/model/deepseek-client.js'
+import { MiniMaxClient } from '../src/adapters/model/minimax-client.js'
 import { OpenAiCompatClient } from '../src/adapters/model/openai-compat-client.js'
 import { ZhipuClient } from '../src/adapters/model/zhipu-client.js'
 import {
@@ -511,6 +512,108 @@ describe('OpenAiCompatClient', () => {
     })
   })
 
+  it('maps MiniMax-M3 thinking controls to adaptive and disabled', async () => {
+    const response = {
+      id: 'minimax-m3',
+      model: 'MiniMax-M3',
+      choices: [{ index: 0, finish_reason: 'stop', message: { role: 'assistant', content: 'ok' } }],
+      usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 }
+    }
+    const sentBodies: Array<Record<string, unknown>> = []
+    const fetchImpl: typeof fetch = async (_url, init) => {
+      sentBodies.push(JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>)
+      return new Response(JSON.stringify(response), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      })
+    }
+    const client = new MiniMaxClient({
+      baseUrl: 'https://api.minimaxi.com/v1',
+      apiKey: 'k',
+      model: 'MiniMax-M3',
+      fetchImpl,
+      nonStreaming: true,
+      models: {
+        profiles: {
+          'MiniMax-M3': {
+            supportsThinking: true,
+            thinkingLevel: []
+          }
+        }
+      }
+    })
+
+    const enabledRequest = buildRequest(new AbortController().signal)
+    enabledRequest.model = 'MiniMax-M3'
+    enabledRequest.reasoningEffort = 'enabled'
+    for await (const _chunk of client.stream(enabledRequest)) {
+      // drain
+    }
+
+    const disabledRequest = buildRequest(new AbortController().signal)
+    disabledRequest.model = 'MiniMax-M3'
+    disabledRequest.reasoningEffort = 'disabled'
+    for await (const _chunk of client.stream(disabledRequest)) {
+      // drain
+    }
+
+    expect(sentBodies[0]).toMatchObject({
+      thinking: { type: 'adaptive' },
+      reasoning_split: true
+    })
+    expect(sentBodies[0]?.reasoning_effort).toBeUndefined()
+    expect(sentBodies[1]).toMatchObject({
+      thinking: { type: 'disabled' }
+    })
+    expect(sentBodies[1]?.reasoning_split).toBeUndefined()
+    expect(sentBodies[1]?.reasoning_effort).toBeUndefined()
+  })
+
+  it('does not send disabled thinking to non-M3 MiniMax thinking models', async () => {
+    const response = {
+      id: 'minimax-m2',
+      model: 'MiniMax-M2.6',
+      choices: [{ index: 0, finish_reason: 'stop', message: { role: 'assistant', content: 'ok' } }],
+      usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 }
+    }
+    const sentBodies: Array<Record<string, unknown>> = []
+    const fetchImpl: typeof fetch = async (_url, init) => {
+      sentBodies.push(JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>)
+      return new Response(JSON.stringify(response), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      })
+    }
+    const client = new MiniMaxClient({
+      baseUrl: 'https://api.minimaxi.com/v1',
+      apiKey: 'k',
+      model: 'MiniMax-M2.6',
+      fetchImpl,
+      nonStreaming: true,
+      models: {
+        profiles: {
+          'MiniMax-M2.6': {
+            supportsThinking: true,
+            thinkingLevel: []
+          }
+        }
+      }
+    })
+
+    const disabledRequest = buildRequest(new AbortController().signal)
+    disabledRequest.model = 'MiniMax-M2.6'
+    disabledRequest.reasoningEffort = 'disabled'
+    for await (const _chunk of client.stream(disabledRequest)) {
+      // drain
+    }
+
+    expect(sentBodies[0]).not.toHaveProperty('thinking')
+    expect(sentBodies[0]).toMatchObject({
+      reasoning_split: true
+    })
+    expect(sentBodies[0]?.reasoning_effort).toBeUndefined()
+  })
+
   it('sends per-request router controls when requested', async () => {
     const response = {
       id: 'router',
@@ -916,6 +1019,92 @@ describe('OpenAiCompatClient', () => {
     expect(usageChunk.usage.costUsd).toBeCloseTo(0.000183)
     expect(usageChunk.usage.costCny).toBeCloseTo(0.0013176)
     expect(usageChunk.usage.cacheSavingsUsd).toBeCloseTo(0.000837)
+  })
+
+  it('estimates cost from configured tiered model pricing', async () => {
+    const sentUsagePayloads = [
+      {
+        prompt_tokens: 500000,
+        completion_tokens: 1000,
+        total_tokens: 501000,
+        prompt_cache_hit_tokens: 100000,
+        prompt_cache_miss_tokens: 400000
+      },
+      {
+        prompt_tokens: 600000,
+        completion_tokens: 1000,
+        total_tokens: 601000,
+        prompt_cache_hit_tokens: 100000,
+        prompt_cache_miss_tokens: 500000
+      }
+    ]
+    const fetchImpl: typeof fetch = async () => {
+      const usage = sentUsagePayloads.shift()
+      return new Response(JSON.stringify({
+        id: 'r-tiered',
+        model: 'MiniMax-M3',
+        choices: [
+          {
+            index: 0,
+            finish_reason: 'stop',
+            message: { role: 'assistant', content: 'done' }
+          }
+        ],
+        usage
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      })
+    }
+    const client = new OpenAiCompatClient({
+      baseUrl: 'https://api.example.com',
+      apiKey: 'k',
+      model: 'MiniMax-M3',
+      fetchImpl,
+      nonStreaming: true,
+      models: {
+        profiles: {
+          'MiniMax-M3': {
+            priceInput: '0.3',
+            priceOutput: '1.2',
+            priceInputCacheRead: '0.06',
+            priceInputCacheWrite: '0.375',
+            priceTiers: [
+              {
+                minInputTokens: 512001,
+                priceInput: '0.6',
+                priceOutput: '2.4',
+                priceInputCacheRead: '0.12',
+                priceInputCacheWrite: '0.375'
+              }
+            ]
+          }
+        }
+      }
+    })
+
+    const shortRequest = buildRequest(new AbortController().signal)
+    shortRequest.model = 'MiniMax-M3'
+    const shortChunks = []
+    for await (const chunk of client.stream(shortRequest)) {
+      shortChunks.push(chunk)
+    }
+    const longRequest = buildRequest(new AbortController().signal)
+    longRequest.model = 'MiniMax-M3'
+    const longChunks = []
+    for await (const chunk of client.stream(longRequest)) {
+      longChunks.push(chunk)
+    }
+
+    const shortUsage = shortChunks.find((c) => c.kind === 'usage')
+    const longUsage = longChunks.find((c) => c.kind === 'usage')
+    if (!shortUsage || shortUsage.kind !== 'usage') throw new Error('expected short usage chunk')
+    if (!longUsage || longUsage.kind !== 'usage') throw new Error('expected long usage chunk')
+    expect(shortUsage.usage.costUsd).toBeCloseTo(0.1572)
+    expect(shortUsage.usage.cacheSavingsUsd).toBeCloseTo(0.0315)
+    expect(longUsage.usage.costUsd).toBeCloseTo(0.2019)
+    expect(longUsage.usage.cacheSavingsUsd).toBeCloseTo(0.0255)
+    expect(client.estimateInputCost('MiniMax-M3', 600000)?.costUsd).toBeCloseTo(0.36)
   })
 
   it('sends tools in a canonical order for a stable cache prefix', async () => {

@@ -46,6 +46,13 @@ export const DEFAULT_WRITE_INLINE_LONG_COMPLETION_MAX_TOKENS = 256
 export const DEFAULT_DRAGON_PORT = 8899
 export const DEFAULT_WEIXIN_BRIDGE_RPC_URL = 'http://127.0.0.1:18790/api/v1/admin/rpc'
 export type { ModelEndpointFormat }
+export type ModelPriceTierV1 = {
+  minInputTokens?: number
+  priceInput?: string
+  priceOutput?: string
+  priceInputCacheRead?: string
+  priceInputCacheWrite?: string
+}
 export type ModelDetailV1 = {
   id: string
   name?: string
@@ -53,6 +60,7 @@ export type ModelDetailV1 = {
   priceOutput?: string
   priceInputCacheRead?: string
   priceInputCacheWrite?: string
+  priceTiers?: ModelPriceTierV1[]
   maxContext?: number
   maxOutput?: number
   supportsThinking?: boolean

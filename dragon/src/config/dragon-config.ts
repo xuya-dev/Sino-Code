@@ -25,6 +25,15 @@ export const DEFAULT_DRAGON_MODEL = ''
 
 const PositiveInt = z.number().int().positive()
 const PositiveRatio = z.number().positive().max(1)
+const ModelPriceTierConfigSchema = z
+  .object({
+    minInputTokens: PositiveInt.optional(),
+    priceInput: z.string().optional(),
+    priceOutput: z.string().optional(),
+    priceInputCacheRead: z.string().optional(),
+    priceInputCacheWrite: z.string().optional()
+  })
+  .strict()
 
 export const ModelContextCompactionProfileConfigSchema = z
   .object({
@@ -64,6 +73,7 @@ export const ModelContextProfileConfigSchema = z
     priceOutput: z.string().optional(),
     priceInputCacheRead: z.string().optional(),
     priceInputCacheWrite: z.string().optional(),
+    priceTiers: z.array(ModelPriceTierConfigSchema).optional(),
     supportsThinking: z.boolean().optional(),
     thinkingLevel: z.array(z.string().min(1)).optional()
   })

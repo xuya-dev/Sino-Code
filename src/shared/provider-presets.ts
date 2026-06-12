@@ -17,7 +17,7 @@ export type ProviderPreset = {
 export const PROVIDER_PRESETS: ProviderPreset[] = [
   {
     id: 'deepseek',
-    nameZh: 'DeepSeek',
+    nameZh: '深度求索',
     nameEn: 'DeepSeek',
     endpoints: [
       { id: 'default', labelZh: 'API (Beta 缓存优化)', labelEn: 'API (Beta Cache)', baseUrl: 'https://api.deepseek.com/beta' },
@@ -28,8 +28,8 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
   },
   {
     id: 'zhipu',
-    nameZh: '智谱 AI',
-    nameEn: 'Zhipu AI',
+    nameZh: '智谱',
+    nameEn: 'Z.ai',
     endpoints: [
       { id: 'coding', labelZh: 'BigModel Coding Plan', labelEn: 'BigModel Coding Plan', baseUrl: 'https://open.bigmodel.cn/api/coding/paas/v4' },
       { id: 'cn', labelZh: 'BigModel', labelEn: 'BigModel', baseUrl: 'https://open.bigmodel.cn/api/paas/v4' },
@@ -41,7 +41,7 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
   },
   {
     id: 'minimax',
-    nameZh: 'MiniMax',
+    nameZh: '稀宇科技',
     nameEn: 'MiniMax',
     endpoints: [
       { id: 'cn', labelZh: '国内', labelEn: 'Domestic', baseUrl: 'https://api.minimaxi.com/v1' },
@@ -52,8 +52,8 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
   },
   {
     id: 'moonshot',
-    nameZh: '月之暗面 (Kimi)',
-    nameEn: 'Moonshot (Kimi)',
+    nameZh: '月之暗面',
+    nameEn: 'Moonshot',
     endpoints: [
       { id: 'coding', labelZh: 'Kimi For Coding', labelEn: 'Kimi For Coding', baseUrl: 'https://api.kimi.com/coding/v1' },
       { id: 'cn', labelZh: '国内按量', labelEn: 'Domestic', baseUrl: 'https://api.moonshot.cn/v1' },

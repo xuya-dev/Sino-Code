@@ -16,6 +16,14 @@ export type ModelContextCompactionProfileConfig = {
   hardThreshold?: number
 }
 
+export type ModelPriceTierConfig = {
+  minInputTokens?: number
+  priceInput?: string
+  priceOutput?: string
+  priceInputCacheRead?: string
+  priceInputCacheWrite?: string
+}
+
 export type ModelContextProfile = ModelContextThresholds & {
   canonicalModel: string
   modelIds: readonly string[]
@@ -46,6 +54,7 @@ export type ModelContextProfileConfig = {
   priceOutput?: string
   priceInputCacheRead?: string
   priceInputCacheWrite?: string
+  priceTiers?: readonly ModelPriceTierConfig[]
   supportsThinking?: boolean
   thinkingLevel?: readonly string[]
 }
